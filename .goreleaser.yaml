@@ -1,0 +1,129 @@
+version: 2
+project_name: doko
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    main: ./cmd/doko
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.buildTime={{.Date}}
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+
+changelog:
+  use: git
+  sort: asc
+  groups:
+    - title: "Features"
+      regexp: '^feat'
+      order: 0
+    - title: "Bug Fixes"
+      regexp: '^fix'
+      order: 1
+    - title: "Documentation"
+      regexp: '^docs'
+      order: 2
+    - title: "Build & CI"
+      regexp: '^(build|ci)'
+      order: 3
+    - title: "Other Changes"
+      order: 999
+  filters:
+    exclude:
+      - "^chore"
+      - "^style"
+      - "Merge pull request"
+      - "Merge branch"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/broadsage/doko:{{.Version}}-amd64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description=A BuildKit frontend for building container images"
+      - "--label=org.opencontainers.image.url=https://github.com/broadsage/doko"
+      - "--label=org.opencontainers.image.source=https://github.com/broadsage/doko"
+      - "--label=org.opencontainers.image.revision={{.Commit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+
+  - image_templates:
+      - "ghcr.io/broadsage/doko:{{.Version}}-arm64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description=A BuildKit frontend for building container images"
+      - "--label=org.opencontainers.image.url=https://github.com/broadsage/doko"
+      - "--label=org.opencontainers.image.source=https://github.com/broadsage/doko"
+      - "--label=org.opencontainers.image.revision={{.Commit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.licenses=Apache-2.0"
+
+docker_manifests:
+  - name_template: "ghcr.io/broadsage/doko:{{.Version}}"
+    image_templates:
+      - "ghcr.io/broadsage/doko:{{.Version}}-amd64"
+      - "ghcr.io/broadsage/doko:{{.Version}}-arm64"
+  - name_template: "ghcr.io/broadsage/doko:latest"
+    image_templates:
+      - "ghcr.io/broadsage/doko:{{.Version}}-amd64"
+      - "ghcr.io/broadsage/doko:{{.Version}}-arm64"
+
+# Sign multi-arch Docker manifests with cosign keyless signing.
+# Verification: cosign verify ghcr.io/broadsage/doko:<version> \
+#   --certificate-identity-regexp "https://github.com/broadsage/doko" \
+#   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - --yes
+
+# Sign the checksums file with cosign keyless signing.
+# Produces a .bundle file (JSON containing certificate + signature).
+signs:
+  - cmd: cosign
+    signature: "${artifact}.bundle"
+    args:
+      - sign-blob
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - --yes
+    artifacts: checksum
+    output: true
+
+release:
+  draft: false
+  prerelease: auto

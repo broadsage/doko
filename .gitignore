@@ -1,0 +1,16 @@
+# Binaries
+/keepkit-frontend
+*.exe
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,0 +1,66 @@
+# syntax=ghcr.io/broadsage/doko:v1
+
+name: Redis Hardened
+image: ghcr.io/broadsage/doko/redis
+variant: production
+tags:
+  - latest
+  - "8.0"
+  - 8.0-alpine
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-16"
+  end-of-life: "2029-07-16"
+
+vars:
+  REDIS_VERSION: "8.0.0"
+
+annotations:
+  org.opencontainers.image.title: "Redis Hardened"
+  org.opencontainers.image.description: "Hardened Redis server built with Doko"
+  org.opencontainers.image.version: "${REDIS_VERSION}"
+  org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
+
+security:
+  policy:
+    fail-on-cve: high
+    allowed-licenses:
+      - BSD-3-Clause
+      - MIT
+      - Apache-2.0
+  profiles:
+    - seccomp
+    - landlock
+
+accounts:
+  root: false
+  run-as: redis
+  users:
+    - name: redis
+      uid: 999
+      gid: 999
+  groups:
+    - name: redis
+      gid: 999
+      members:
+        - redis
+
+contents:
+  packages:
+    - redis
+    - "!telnet"
+  paths:
+    - type: directory
+      path: /data
+      uid: 999
+      gid: 999
+      mode: "0750"
+
+work-dir: /data
+
+runtime:
+  ports:
+    - 6379
+  entrypoint: ["redis-server", "--protected-mode", "no"]

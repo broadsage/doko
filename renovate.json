@@ -1,0 +1,57 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:pinDigests",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "schedule": ["before 6am on Monday"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "description": "Group containerd package updates together",
+      "groupName": "containerd packages",
+      "matchUpdateTypes": ["patch", "minor", "major"],
+      "matchPackageNames": [
+        "github.com/containerd/{/,}**"
+      ]
+    },
+    {
+      "description": "Group moby package updates together",
+      "groupName": "moby packages",
+      "matchUpdateTypes": ["patch", "minor", "major"],
+      "matchPackageNames": [
+        "github.com/moby/{/,}**"
+      ]
+    },
+    {
+      "description": "Automerge Go indirect dependency patch updates",
+      "matchDepTypes": ["indirect"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    {
+      "description": "Group and automerge GitHub Actions patch and minor updates",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "matchUpdateTypes": ["patch", "minor"],
+      "automerge": true
+    },
+    {
+      "description": "Require manual review for GitHub Actions major updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    },
+    {
+      "description": "Group Dockerfile base image updates",
+      "matchManagers": ["dockerfile"],
+      "groupName": "docker base images",
+      "automerge": false
+    }
+  ]
+}
+

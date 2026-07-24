@@ -1,0 +1,83 @@
+# syntax=ghcr.io/broadsage/doko:v1
+
+name: Postgres Hardened
+image: ghcr.io/broadsage/doko/postgres
+variant: production
+tags:
+  - latest
+  - "18"
+  - 18-alpine
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-16"
+  end-of-life: "2031-07-16"
+
+vars:
+  PG_VERSION: "18.0"
+  PGDATA: "/var/lib/postgresql/data"
+
+annotations:
+  org.opencontainers.image.title: "Postgres Hardened"
+  org.opencontainers.image.description: "Hardened PostgreSQL server built with Doko"
+  org.opencontainers.image.version: "${PG_VERSION}"
+  org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
+
+security:
+  policy:
+    fail-on-cve: high
+    allowed-licenses:
+      - PostgreSQL
+      - MIT
+      - BSD-3-Clause
+      - Apache-2.0
+  profiles:
+    - seccomp
+    - landlock
+
+accounts:
+  root: false
+  run-as: postgres
+  users:
+    - name: postgres
+      uid: 70
+      gid: 70
+  groups:
+    - name: postgres
+      gid: 70
+      members:
+        - postgres
+
+contents:
+  packages:
+    - postgresql18
+    - postgresql18-client
+    - "!telnet"
+  paths:
+    - type: directory
+      path: /var/lib/postgresql
+      uid: 70
+      gid: 70
+      mode: "0750"
+    - type: directory
+      path: /var/lib/postgresql/data
+      uid: 70
+      gid: 70
+      mode: "0700"
+    - type: directory
+      path: /var/run/postgresql
+      uid: 70
+      gid: 70
+      mode: "0775"
+
+stop-signal: SIGINT
+
+work-dir: /var/lib/postgresql
+
+runtime:
+  ports:
+    - 5432
+  env:
+    PGDATA: "${PGDATA}"
+  entrypoint: ["postgres"]

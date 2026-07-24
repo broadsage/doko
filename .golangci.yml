@@ -1,0 +1,121 @@
+version: "2"
+
+run:
+  issues-exit-code: 1
+
+linters:
+  enable:
+    # --- Style & correctness ---
+    - asciicheck       # non-ASCII identifiers
+    - misspell         # typos in comments and strings
+    - whitespace       # unnecessary blank lines
+    - unconvert        # unnecessary type conversions
+    - godot            # comments should end with a period
+
+    # --- Bug prevention ---
+    - bodyclose        # HTTP response bodies must be closed
+    - errcheck         # all errors must be checked
+    - errorlint        # correct error wrapping with %w
+    - nilerr           # do not return nil when err is non-nil
+    - noctx            # HTTP requests must use context-aware methods
+    - durationcheck    # prevent time.Duration multiplication bugs
+    - reassign         # prevent accidental package-level variable reassignment
+
+    # --- Context propagation ---
+    - contextcheck     # context must be propagated correctly through call chains
+
+    # --- Error wrapping ---
+    - wrapcheck        # errors from external packages must be wrapped
+
+    # --- Code quality ---
+    - gocritic         # opinionated Go suggestions
+    - prealloc         # slice pre-allocation opportunities
+    - unparam          # unused function parameters
+    - staticcheck      # comprehensive static analysis
+    - modernize        # encourage modern Go idioms
+
+    # --- Security ---
+    - gosec            # security-sensitive patterns (exec, HTTP, crypto)
+
+    # --- API design & completeness ---
+    - exhaustive       # exhaustive switch statements on iota types (SeverityLevel)
+    - musttag          # exported struct fields must have JSON/YAML tags
+    - usestdlibvars    # prefer stdlib constants (http.MethodPost, http.StatusOK, etc.)
+    - nolintlint       # nolint directives must be specific and explained
+
+    # --- Import management ---
+    - importas         # consistent import aliases
+    - tparallel        # tests should call t.Parallel()
+
+    # --- Debug guard ---
+    - forbidigo        # block debug print statements
+
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: '^(print|println)$'
+          msg: "use fmt package for output"
+    gosec:
+      excludes:
+        - G115  # integer overflow conversion — too many false positives
+        - G107  # URL as HTTP request arg — intentional for user-provided cert URLs
+    modernize:
+      disable:
+        # Suggest replacing omitempty with omitzero for struct fields.
+        - omitzero
+    exhaustive:
+      # Require exhaustive switches on all iota-based types (e.g. SeverityLevel)
+      default-signifies-exhaustive: true
+    musttag:
+      functions:
+        - name: encoding/json.Marshal
+          tag: json
+        - name: encoding/json.Unmarshal
+          tag: json
+        - name: gopkg.in/yaml.v3.Marshal
+          tag: yaml
+        - name: gopkg.in/yaml.v3.Unmarshal
+          tag: yaml
+    godot:
+      scope: declarations  # only enforce on exported declarations
+
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - errcheck
+          - gosec
+          - wrapcheck
+          - contextcheck
+        path: _test\.go
+      - linters:
+          - wrapcheck
+        path: ^cmd/
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/broadsage/doko
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

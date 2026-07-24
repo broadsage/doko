@@ -1,0 +1,95 @@
+# syntax=doko:latest
+
+name: Python API
+image: ghcr.io/broadsage/doko/python-api
+variant: production
+tags:
+  - latest
+  - "3.12"
+  - 3.12-alpine
+  - 3.12-alpine3.20
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-16"
+  end-of-life: "2028-10-31"
+
+vars:
+  PYTHON_VERSION: "3.12"
+  WORKDIR_PATH: "/app"
+  APP_PORT: "8000"
+
+annotations:
+  org.opencontainers.image.title: "Python API"
+  org.opencontainers.image.description: "Hardened Python FastAPI service built with Doko"
+  org.opencontainers.image.url: "https://github.com/broadsage/doko"
+  org.opencontainers.image.source: "https://github.com/broadsage/doko"
+  org.opencontainers.image.version: "${PYTHON_VERSION}"
+  org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
+
+security:
+  policy:
+    fail-on-cve: medium
+    allowed-licenses:
+      - MIT
+      - Apache-2.0
+      - BSD-3-Clause
+  profiles:
+    - seccomp
+
+builds:
+  - name: dependency-builder
+    outputs:
+      - source: /app/wheels
+        target: ${WORKDIR_PATH}/wheels
+    contents:
+      packages:
+        - python3
+        - py3-pip
+      paths:
+        - type: directory
+          path: /app
+          uid: 65532
+          gid: 65532
+          mode: "0755"
+      pipeline:
+        - name: install-requirements
+          runs: |
+            pip install --target=/app/wheels fastapi uvicorn
+
+contents:
+  packages:
+    - python3
+  paths:
+    - type: file
+      path: ${WORKDIR_PATH}
+      source: ./src
+      uid: 65532
+      gid: 65532
+      mode: "0755"
+  pipeline:
+    - name: configure-pythonpath
+      runs: |
+        echo "export PYTHONPATH=${WORKDIR_PATH}/wheels:$PYTHONPATH" >> /etc/profile
+
+work-dir: ${WORKDIR_PATH}
+
+entrypoint: ["python3", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${APP_PORT}"]
+
+runtime:
+  user: nonroot
+  ports:
+    - 8000
+
+accounts:
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot

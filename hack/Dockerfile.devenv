@@ -1,0 +1,84 @@
+# hack/Dockerfile.devenv — Development environment for doko.
+# Built and used by hack/make-devenv.sh.
+#
+# Tools included:
+#   - Go (version from go.mod)
+#   - golangci-lint
+#   - goreleaser
+#   - docker-cli + buildx plugin
+#   - gofumpt
+#   - git, make, bash, curl
+
+ARG GO_VERSION=1.25
+FROM golang:${GO_VERSION}-alpine AS devenv
+
+ARG GOLANGCI_LINT_VERSION=v2.12.2
+ARG GORELEASER_VERSION=v2.9.0
+ARG BUILDX_VERSION=v0.23.0
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    git \
+    make \
+    curl \
+    ca-certificates \
+    docker-cli
+
+# Install golangci-lint (direct binary download — avoids install.sh bash dependency on Alpine)
+RUN set -eux; \
+    LINT_ARCH="$(uname -m)"; \
+    case "${LINT_ARCH}" in \
+        x86_64)  LINT_ARCH="amd64" ;; \
+        aarch64) LINT_ARCH="arm64" ;; \
+    esac; \
+    VER="${GOLANGCI_LINT_VERSION#v}"; \
+    TARBALL="golangci-lint-${VER}-linux-${LINT_ARCH}"; \
+    curl -sSfL \
+        "https://github.com/golangci/golangci-lint/releases/download/${GOLANGCI_LINT_VERSION}/${TARBALL}.tar.gz" \
+        -o "/tmp/${TARBALL}.tar.gz"; \
+    tar -xzf "/tmp/${TARBALL}.tar.gz" -C /tmp; \
+    mv "/tmp/${TARBALL}/golangci-lint" /usr/local/bin/golangci-lint; \
+    rm -rf "/tmp/${TARBALL}" "/tmp/${TARBALL}.tar.gz"
+
+# Install goreleaser pre-built binary (avoids Go toolchain version constraints)
+RUN set -eux; \
+    GORELEASER_ARCH="$(uname -m)"; \
+    case "${GORELEASER_ARCH}" in \
+        x86_64)  GORELEASER_ARCH="amd64" ;; \
+        aarch64) GORELEASER_ARCH="arm64" ;; \
+    esac; \
+    curl -sSfL \
+        "https://github.com/goreleaser/goreleaser/releases/download/${GORELEASER_VERSION}/goreleaser_Linux_${GORELEASER_ARCH}.tar.gz" \
+        | tar -xz -C /usr/local/bin goreleaser
+
+# Install docker buildx plugin (required for doko builds: docker buildx build -f doko.yaml)
+RUN set -eux; \
+    BUILDX_ARCH="$(uname -m)"; \
+    case "${BUILDX_ARCH}" in \
+        x86_64)  BUILDX_ARCH="amd64" ;; \
+        aarch64) BUILDX_ARCH="arm64" ;; \
+    esac; \
+    mkdir -p /usr/local/lib/docker/cli-plugins; \
+    curl -sSfL \
+        "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${BUILDX_ARCH}" \
+        -o /usr/local/lib/docker/cli-plugins/docker-buildx; \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+
+# Install gofumpt (stricter gofmt, used by the project)
+RUN go install mvdan.cc/gofumpt@latest \
+    && mv "$(go env GOPATH)/bin/gofumpt" /usr/local/bin/gofumpt
+
+# Pre-warm the Go module cache using only the module manifest
+# (actual source is mounted at runtime — this layer is cache only)
+WORKDIR /workspace
+COPY go.mod go.sum ./
+RUN go mod download
+
+ENV PS1="[doko] ❯ "
+ENV GOFLAGS="-mod=mod"
+ENV CGO_ENABLED=0
+
+WORKDIR /workspace
+
+CMD ["/bin/bash", "-i"]

@@ -1,0 +1,81 @@
+name: Snyk Security
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: '0 6 * * 1' # every Monday at 06:00 UTC
+
+permissions: {}
+
+jobs:
+  snyk-go:
+    name: snyk go
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v5
+        with:
+          go-version-file: './go.mod'
+          check-latest: true
+
+      - name: Run Snyk to check Go modules for vulnerabilities
+        uses: snyk/actions/golang@cdb760004ba9ea4d525f2e043745dfe85bb9077e # master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.OS_RELEASE_SNYK_TOKEN }}
+        with:
+          args: --sarif-file-output=snyk-go.sarif
+
+      - name: Upload Snyk Go results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
+        if: hashFiles('snyk-go.sarif') != ''
+        with:
+          sarif_file: snyk-go.sarif
+
+  snyk-docker:
+    name: snyk docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4
+        with:
+          persist-credentials: false
+
+      - name: Build Docker image for scanning
+        run: docker build -t doko:${{ github.sha }} .
+
+      - name: Run Snyk to check Docker image for vulnerabilities
+        uses: snyk/actions/docker@cdb760004ba9ea4d525f2e043745dfe85bb9077e # master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.OS_RELEASE_SNYK_TOKEN }}
+        with:
+          image: doko:${{ github.sha }}
+          args: --file=Dockerfile --sarif-file-output=snyk-docker.sarif
+
+      - name: Upload Snyk Docker results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@ff0a06e83cb2de871e5a09832bc6a81e7276941f # v3
+        if: hashFiles('snyk-docker.sarif') != ''
+        with:
+          sarif_file: snyk-docker.sarif
