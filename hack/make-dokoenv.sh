@@ -119,8 +119,8 @@ cmd_test() {
 
     # Patch the # syntax= line to use the local image (avoids registry pull).
     local tmpfile=""
-    tmpfile="$(mktemp /tmp/doko-test-XXXXXX.yaml)"
-    trap '[[ -n "${tmpfile}" ]] && rm -f "${tmpfile}"' EXIT
+    tmpfile="$(mktemp /tmp/doko-test-XXXXXX)"
+    trap "rm -f '${tmpfile}'" EXIT
     sed "s|^# syntax=.*|# syntax=${LOCAL_IMAGE}|" "${yaml}" > "${tmpfile}"
 
     local out_tag="doko-test-${example}:local"
@@ -129,6 +129,7 @@ cmd_test() {
     log_info "  frontend: ${LOCAL_IMAGE}"
 
     docker buildx build \
+        --network=host \
         --platform "linux/${ARCH}" \
         --file "${tmpfile}" \
         --load \

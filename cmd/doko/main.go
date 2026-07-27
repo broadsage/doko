@@ -510,27 +510,32 @@ func setImageConfig(spec *config.Spec, result *client.Result) error {
 		"comment":    "buildkit.exporter.image.v0",
 	})
 
-	// 1.5. Add os-release customization
-	if spec.OSRelease.Name != "" || spec.OSRelease.ID != "" {
+	// 2. Keyrings & CA certs copy layer
+	if len(spec.Contents.Keyring) > 0 || len(spec.Contents.CACertificates) > 0 {
 		history = append(history, map[string]any{
-			"created_by": "add metadata",
+			"created_by": "copy keyring and CA certificates",
 			"comment":    "buildkit.exporter.image.v0",
 		})
 	}
 
-	// 2. Add keyring copies
-	for i, keyURL := range spec.Contents.Keyring {
-		filename := fmt.Sprintf("key-%d.pub", i)
-		if parts := strings.Split(keyURL, "/"); len(parts) > 0 {
-			filename = parts[len(parts)-1]
+	// 3. CA certificates update run layer
+	if len(spec.Contents.CACertificates) > 0 {
+		var updateCmd string
+		switch spec.Provider {
+		case "apk", "apt":
+			updateCmd = "update-ca-certificates"
+		case "dnf":
+			updateCmd = "update-ca-trust"
 		}
-		history = append(history, map[string]any{
-			"created_by": fmt.Sprintf("copy keyring %s", filename),
-			"comment":    "buildkit.exporter.image.v0",
-		})
+		if updateCmd != "" {
+			history = append(history, map[string]any{
+				"created_by": updateCmd,
+				"comment":    "buildkit.exporter.image.v0",
+			})
+		}
 	}
 
-	// 3. Add package installs
+	// 4. Add package installs
 	if len(spec.Contents.Packages) > 0 {
 		history = append(history, map[string]any{
 			"created_by": fmt.Sprintf("install packages: %s", strings.Join(spec.Contents.Packages, ", ")),
@@ -538,15 +543,25 @@ func setImageConfig(spec *config.Spec, result *client.Result) error {
 		})
 	}
 
-	// 4. Add account creation
-	if len(spec.Accounts.Users) > 0 || len(spec.Accounts.Groups) > 0 {
+	// 5. System Setup & Hardening Run Layer
+	hasAccounts := len(spec.Accounts.Users) > 0 || len(spec.Accounts.Groups) > 0 || spec.Accounts.Root || !spec.Accounts.Root
+	hasPaths := false
+	for _, p := range spec.Contents.Paths {
+		if p.Type == "directory" || p.Type == "dir" {
+			hasPaths = true
+			break
+		}
+	}
+	hcfg := spec.Security.Hardening
+	hasHardening := hcfg.RemovePackageManager || hcfg.LockShellAccounts
+	if hasAccounts || hasPaths || hasHardening {
 		history = append(history, map[string]any{
-			"created_by": "setup user and group accounts",
+			"created_by": "configure system accounts, directories and hardening",
 			"comment":    "buildkit.exporter.image.v0",
 		})
 	}
 
-	// 5. Add pipeline steps
+	// 6. Add pipeline steps
 	for _, step := range spec.Contents.Pipeline {
 		name := step.Name
 		if name == "" {
@@ -558,20 +573,29 @@ func setImageConfig(spec *config.Spec, result *client.Result) error {
 		})
 	}
 
-	// 6. Add file copies and outputs
+	// 7. App Files, Outputs, and Artifacts Copy Layer
+	hasOSRelease := spec.OSRelease.Name != "" || spec.OSRelease.ID != ""
+	hasSysctl := len(spec.Security.Hardening.Sysctl) > 0
+	hasFilePaths := false
 	for _, p := range spec.Contents.Paths {
+		if (p.Type == "file" || p.Type == "") && p.Source != "" {
+			hasFilePaths = true
+			break
+		}
+	}
+	hasOutputs := false
+	for _, b := range spec.Builds {
+		if len(b.Outputs) > 0 {
+			hasOutputs = true
+			break
+		}
+	}
+	hasArtifacts := len(spec.Artifacts) > 0
+	if hasOSRelease || hasSysctl || hasFilePaths || hasOutputs || hasArtifacts {
 		history = append(history, map[string]any{
-			"created_by": fmt.Sprintf("setup path %s", p.Path),
+			"created_by": "copy application files, outputs, and artifacts",
 			"comment":    "buildkit.exporter.image.v0",
 		})
-	}
-	for _, b := range spec.Builds {
-		for _, o := range b.Outputs {
-			history = append(history, map[string]any{
-				"created_by": fmt.Sprintf("copy %s -> %s", o.Source, o.Target),
-				"comment":    "buildkit.exporter.image.v0",
-			})
-		}
 	}
 
 	imgConfig["history"] = history

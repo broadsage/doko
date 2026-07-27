@@ -51,6 +51,7 @@ runs:
         fi
 
         docker buildx build \
+          --network=host \
           --file "${{ inputs.file }}" \
           --tag "${{ inputs.tags }}" \
           $PUSH_FLAG \
