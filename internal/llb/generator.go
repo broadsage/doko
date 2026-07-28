@@ -586,11 +586,7 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 			_, _ = fmt.Fprintf(&sb, "BUG_REPORT_URL=%q\n", cfg.BugReportURL)
 		}
 
-		if fileAction == nil {
-			fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
-		} else {
-			fileAction = fileAction.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
-		}
+		fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
 	}
 
 	// 2. Write sysctl config
