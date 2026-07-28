@@ -376,7 +376,7 @@ func (g *Generator) bootstrapBaseLayout(platform ocispecs.Platform, baseRef stri
 func (g *Generator) setupAccounts(state buildkitllb.State) buildkitllb.State {
 	var commands []string
 
-	if len(g.Spec.Accounts.Users) > 0 || len(g.Spec.Accounts.Groups) > 0 || g.Spec.Accounts.Root || !g.Spec.Accounts.Root {
+	if len(g.Spec.Accounts.Users) > 0 || len(g.Spec.Accounts.Groups) > 0 || g.Spec.Accounts.RunAs != "" {
 		if !g.Spec.Accounts.Root {
 			commands = append(commands, "sed -i '/^root:/d' /etc/passwd /etc/group /etc/shadow 2>/dev/null || true")
 		} else {
