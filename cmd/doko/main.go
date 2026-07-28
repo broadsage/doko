@@ -67,6 +67,18 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 		return nil, fmt.Errorf("failed to parse layerkit config: %w", err)
 	}
 
+	// 3.5 Parse build arguments from client options and merge into spec.Vars
+	buildOpts := c.BuildOpts()
+	for k, v := range buildOpts.Opts {
+		if strings.HasPrefix(k, "build-arg:") {
+			argKey := strings.TrimPrefix(k, "build-arg:")
+			if spec.Vars == nil {
+				spec.Vars = make(map[string]string)
+			}
+			spec.Vars[argKey] = v
+		}
+	}
+
 	var vexData []byte
 	if spec.Security.Policy.VEX.Path != "" {
 		srcVex, err := bc.ReadEntrypoint(ctx, spec.Security.Policy.VEX.Path)

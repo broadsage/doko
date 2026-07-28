@@ -124,6 +124,7 @@ type PolicyConfig struct {
 type PipelineStep struct {
 	Name string `yaml:"name,omitempty" json:"name,omitempty"`
 	Runs string `yaml:"runs"           json:"runs"`
+	SSH  bool   `yaml:"ssh,omitempty"  json:"ssh,omitempty"`
 }
 
 // ContentsConfig lists packages and local files to include.

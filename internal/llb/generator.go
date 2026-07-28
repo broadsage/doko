@@ -50,16 +50,12 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 	// 2. Bootstrap base OS layout starting from scratch to drop parent history
 	base := g.bootstrapBaseLayout(platform, baseRef)
 
-	// 2.1. Copy keyrings and CA certificates
-	state, hasCAs := configureKeysAndCAs(base, g.Spec.Provider, g.Spec.Contents)
-
-	// 2.15. Update CA certificates run (if any were copied)
-	if hasCAs {
-		state = runUpdateCAsFor(state, g.Spec.Provider)
-	}
+	// 2.15. Update CA certificates run (if any are configured)
+	state := runUpdateCAsFor(base, g.Spec.Provider, g.Spec.Contents)
 
 	// 2.2. Install packages via the appropriate package manager.
-	state, err := g.installPackages(state)
+	var err error
+	state, err = g.installPackages(state)
 	if err != nil {
 		return nil, fmt.Errorf("package installation failed: %w", err)
 	}
@@ -132,11 +128,8 @@ func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b 
 	// Bootstrap per-stage base layout starting from scratch
 	base := g.bootstrapBaseLayout(platform, stageBaseRef)
 
-	// Configure keyrings and custom CA certificates for the sub-stage
-	state, hasCAs := configureKeysAndCAs(base, provider, b.Contents)
-	if hasCAs {
-		state = runUpdateCAsFor(state, provider)
-	}
+	// Update CA certificates run (if any are configured)
+	state := runUpdateCAsFor(base, provider, b.Contents)
 
 	state, err := g.installPackagesForContentsWithProvider(state, b.Contents, provider)
 	if err != nil {
@@ -198,6 +191,48 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 	runOpts = append(runOpts, buildkitllb.WithCustomName(fmt.Sprintf("manage packages via %s", providerName)))
 	runOpts = append(runOpts, p.CacheMounts()...)
 
+	// Mount keyring files dynamically (Read-Only)
+	for i, keyURL := range contents.Keyring {
+		filename := fmt.Sprintf("key-%d.pub", i)
+		if parts := strings.Split(keyURL, "/"); len(parts) > 0 {
+			filename = parts[len(parts)-1]
+		}
+		dest := p.KeyringDest(filename)
+		if dest != "" {
+			var srcState buildkitllb.State
+			var srcPath string
+			if strings.HasPrefix(keyURL, "http://") || strings.HasPrefix(keyURL, "https://") {
+				srcState = buildkitllb.HTTP(keyURL)
+				srcPath = "/" + filename
+			} else {
+				srcState = buildkitllb.Local("context", buildkitllb.SharedKeyHint(keyURL))
+				srcPath = keyURL
+			}
+			runOpts = append(runOpts, buildkitllb.AddMount(dest, srcState, buildkitllb.SourcePath(srcPath), buildkitllb.Readonly))
+		}
+	}
+
+	// Mount CA certificates dynamically (Read-Only)
+	for i, certPath := range contents.CACertificates {
+		filename := fmt.Sprintf("ca-%d.crt", i)
+		if parts := strings.Split(certPath, "/"); len(parts) > 0 {
+			filename = parts[len(parts)-1]
+		}
+		dest := p.CACertDest(filename)
+		if dest != "" {
+			var srcState buildkitllb.State
+			var srcPath string
+			if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
+				srcState = buildkitllb.HTTP(certPath)
+				srcPath = "/" + filename
+			} else {
+				srcState = buildkitllb.Local("context", buildkitllb.SharedKeyHint(certPath))
+				srcPath = certPath
+			}
+			runOpts = append(runOpts, buildkitllb.AddMount(dest, srcState, buildkitllb.SourcePath(srcPath), buildkitllb.Readonly))
+		}
+	}
+
 	return base.Run(runOpts...).Root(), nil
 }
 
@@ -219,6 +254,10 @@ func (g *Generator) runPipelineForContents(state buildkitllb.State, contents con
 		}
 		if privileged {
 			opts = append(opts, buildkitllb.With(buildkitllb.Security(buildkitllb.SecurityModeInsecure)))
+		}
+		if step.SSH {
+			opts = append(opts, buildkitllb.AddSSHSocket(buildkitllb.SSHID("default"), buildkitllb.SSHSocketTarget("/run/ssh-agent.sock")))
+			opts = append(opts, buildkitllb.AddEnv("SSH_AUTH_SOCK", "/run/ssh-agent.sock"))
 		}
 		state = state.Run(opts...).Root()
 	}
@@ -583,77 +622,38 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 	return state
 }
 
-// configureKeysAndCAs copies custom keys and CA certificates into a single consolidated FileAction layer.
-func configureKeysAndCAs(state buildkitllb.State, providerName string, contents config.ContentsConfig) (buildkitllb.State, bool) {
-	p, err := GetProvider(providerName)
-	if err != nil {
-		return state, false
-	}
-	var fileAction *buildkitllb.FileAction
-	hasCAs := false
-
-	// 1. Keyrings
-	for i, keyURL := range contents.Keyring {
-		filename := fmt.Sprintf("key-%d.pub", i)
-		if parts := strings.Split(keyURL, "/"); len(parts) > 0 {
-			filename = parts[len(parts)-1]
-		}
-		dest := p.KeyringDest(filename)
-		if dest != "" {
-			keyState := buildkitllb.HTTP(keyURL)
-			if fileAction == nil {
-				fileAction = buildkitllb.Copy(keyState, "/"+filename, dest, &buildkitllb.CopyInfo{CreateDestPath: true})
-			} else {
-				fileAction = fileAction.Copy(keyState, "/"+filename, dest, &buildkitllb.CopyInfo{CreateDestPath: true})
-			}
-		}
-	}
-
-	// 2. CA Certificates
-	for i, certPath := range contents.CACertificates {
-		filename := fmt.Sprintf("ca-%d.crt", i)
-		if parts := strings.Split(certPath, "/"); len(parts) > 0 {
-			filename = parts[len(parts)-1]
-		}
-		dest := p.CACertDest(filename)
-		if dest != "" {
-			var srcState buildkitllb.State
-			var srcPath string
-			if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
-				srcState = buildkitllb.HTTP(certPath)
-				srcPath = "/" + filename
-			} else {
-				srcState = buildkitllb.Local("context", buildkitllb.SharedKeyHint(certPath))
-				srcPath = certPath
-			}
-
-			if fileAction == nil {
-				fileAction = buildkitllb.Copy(srcState, srcPath, dest, &buildkitllb.CopyInfo{CreateDestPath: true})
-			} else {
-				fileAction = fileAction.Copy(srcState, srcPath, dest, &buildkitllb.CopyInfo{CreateDestPath: true})
-			}
-			hasCAs = true
-		}
-	}
-
-	if fileAction != nil {
-		state = state.File(fileAction, buildkitllb.WithCustomName("copy keyring and CA certificates"))
-	}
-	return state, hasCAs
-}
-
-// runUpdateCAsFor runs update-ca-certificates/update-ca-trust for a given provider.
-func runUpdateCAsFor(state buildkitllb.State, providerName string) buildkitllb.State {
+// runUpdateCAsFor runs update-ca-certificates/update-ca-trust for a given provider with dynamic CA certs mounts.
+func runUpdateCAsFor(state buildkitllb.State, providerName string, contents config.ContentsConfig) buildkitllb.State {
 	p, err := GetProvider(providerName)
 	if err != nil {
 		return state
 	}
 	updateCmd := p.UpdateCACertCommand()
-	if len(updateCmd) > 0 {
-		state = state.Run(
-			buildkitllb.Args(updateCmd),
-			buildkitllb.WithCustomName("update-ca-certificates"),
-		).Root()
+	if len(updateCmd) > 0 && len(contents.CACertificates) > 0 {
+		var runOpts []buildkitllb.RunOption
+		runOpts = append(runOpts, buildkitllb.Args(updateCmd))
+		runOpts = append(runOpts, buildkitllb.WithCustomName("update-ca-certificates"))
+
+		for i, certPath := range contents.CACertificates {
+			filename := fmt.Sprintf("ca-%d.crt", i)
+			if parts := strings.Split(certPath, "/"); len(parts) > 0 {
+				filename = parts[len(parts)-1]
+			}
+			dest := p.CACertDest(filename)
+			if dest != "" {
+				var srcState buildkitllb.State
+				var srcPath string
+				if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
+					srcState = buildkitllb.HTTP(certPath)
+					srcPath = "/" + filename
+				} else {
+					srcState = buildkitllb.Local("context", buildkitllb.SharedKeyHint(certPath))
+					srcPath = certPath
+				}
+				runOpts = append(runOpts, buildkitllb.AddMount(dest, srcState, buildkitllb.SourcePath(srcPath), buildkitllb.Readonly))
+			}
+		}
+		state = state.Run(runOpts...).Root()
 	}
 	return state
 }
