@@ -173,7 +173,7 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 
 	var runOpts []buildkitllb.RunOption
 	runOpts = append(runOpts, buildkitllb.Args([]string{"/bin/sh", "-c", strings.TrimSpace(script)}))
-	runOpts = append(runOpts, buildkitllb.WithCustomName(fmt.Sprintf("manage packages via %s", providerName)))
+	runOpts = append(runOpts, buildkitllb.WithCustomName(fmt.Sprintf("provision packages via %s", providerName)))
 	runOpts = append(runOpts, p.CacheMounts()...)
 
 	// Mount keyring files dynamically (Read-Only)
@@ -218,7 +218,20 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 		}
 	}
 
-	return base.Run(runOpts...).Root(), nil
+	// 1. Run the package manager inside a helper stage
+	helperState := base.Run(runOpts...).Root()
+
+	// 2. Determine a clean custom name for the package layer (dynamic truncation)
+	var layerName string
+	if len(installs) <= 3 {
+		layerName = fmt.Sprintf("install packages: %s", strings.Join(installs, ", "))
+	} else {
+		layerName = fmt.Sprintf("install %d packages via %s", len(installs), providerName)
+	}
+
+	// 3. Copy files natively from helperState back to base
+	fileAction := buildkitllb.Copy(helperState, "/", "/")
+	return base.File(fileAction, buildkitllb.WithCustomName(layerName)), nil
 }
 
 // runPipeline executes any custom pipeline shell commands for the primary spec.
