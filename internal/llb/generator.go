@@ -351,10 +351,13 @@ func (g *Generator) bootstrapBaseLayout(platform ocispecs.Platform, baseRef stri
 		}),
 		buildkitllb.AddMount("/archive", tarFile, buildkitllb.Readonly),
 		buildkitllb.AddMount("/rootfs", cleanScratch),
-		buildkitllb.WithCustomName("add root layout"),
+		buildkitllb.WithCustomName("extract root layout archive"),
 	)
 
-	return unpackRun.GetMount("/rootfs")
+	return buildkitllb.Scratch().File(
+		buildkitllb.Copy(unpackRun.GetMount("/rootfs"), "/", "/"),
+		buildkitllb.WithCustomName("add root layout"),
+	)
 }
 
 // setupAccounts creates user accounts and groups as an individual layer.
