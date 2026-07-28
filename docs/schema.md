@@ -32,6 +32,7 @@ Doko validates the schema at **build-time** and rejects any configuration that v
 - [`artifacts` — External OCI Artifacts](#artifacts--external-oci-artifacts)
 - [`runtime` — Container Runtime Configuration](#runtime--container-runtime-configuration)
 - [`stop-signal` — Process Stop Signal](#stop-signal--process-stop-signal)
+- [`timeout-seconds` — Network Request Timeout](#timeout-seconds--network-request-timeout)
 - [Complete Example](#complete-example)
 
 ---
@@ -60,6 +61,7 @@ These fields are defined at the root level of `doko.yaml`.
 | `artifacts` | `[]object` | No | External OCI images from which to import files directly. |
 | `runtime` | `object` | No | OCI runtime configuration (user, ports, env). |
 | `stop-signal` | `string` | No | Override the default process stop signal (e.g. `SIGINT`, `SIGTERM`). |
+| `timeout-seconds` | `int` | No | Network request timeout for package resolvers and scanners (defaults to `30`). |
 | `work-dir` | `string` | No | Sets the working directory inside the container. |
 | `entrypoint` | `[]string` | No | The process launched as PID 1 inside the container. |
 | `cmd` | `[]string` | No | Default arguments passed to the entrypoint. |
@@ -517,6 +519,19 @@ Accepted values: Any valid POSIX signal name — `SIGTERM`, `SIGINT`, `SIGQUIT`,
 
 ---
 
+## `timeout-seconds` — Network Request Timeout
+
+**Purpose:** Configure the network request timeout in seconds for fetching remote package indices, vulnerability scanning APIs, and CA certificates.
+
+```yaml
+timeout-seconds: 15
+```
+
+- **Default value:** `30`
+- **Accepted values:** Any positive integer representing seconds.
+
+---
+
 ## `work-dir` — Working Directory
 
 **Purpose:** Set the working directory inside the container for runtime execution (equivalent to the `WORKDIR` instruction in a `Dockerfile`).
@@ -672,6 +687,8 @@ contents:
         ln -sf /dev/stderr /var/log/nginx/error.log
 
 stop-signal: SIGTERM
+
+timeout-seconds: 15
 
 work-dir: /var/www/html
 
