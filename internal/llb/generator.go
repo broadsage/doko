@@ -70,10 +70,7 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 	state = g.applyHardening(state)
 
 	// 6. Run pipeline steps if any (already individual layers per step).
-	state, err = g.runPipeline(state)
-	if err != nil {
-		return nil, fmt.Errorf("pipeline execution failed: %w", err)
-	}
+	state = g.runPipeline(state)
 
 	// 7. Copy local files (individual layer per file)
 	state = g.copyLocalFiles(state)
@@ -135,17 +132,11 @@ func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b 
 	if err != nil {
 		return buildkitllb.State{}, err
 	}
-	state, err = g.setupPathsForContents(state, b.Contents)
-	if err != nil {
-		return buildkitllb.State{}, err
-	}
+	state = g.setupPathsForContents(state, b.Contents)
 	if b.WorkDir != "" {
 		state = state.Dir(b.WorkDir)
 	}
-	state, err = g.runPipelineForContents(state, b.Contents, b.Privileged)
-	if err != nil {
-		return buildkitllb.State{}, err
-	}
+	state = g.runPipelineForContents(state, b.Contents, b.Privileged)
 	return state, nil
 }
 
@@ -237,12 +228,12 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 }
 
 // runPipeline executes any custom pipeline shell commands for the primary spec.
-func (g *Generator) runPipeline(state buildkitllb.State) (buildkitllb.State, error) {
+func (g *Generator) runPipeline(state buildkitllb.State) buildkitllb.State {
 	return g.runPipelineForContents(state, g.Spec.Contents, false)
 }
 
 // runPipelineForContents executes custom pipeline commands for a specific contents config.
-func (g *Generator) runPipelineForContents(state buildkitllb.State, contents config.ContentsConfig, privileged bool) (buildkitllb.State, error) {
+func (g *Generator) runPipelineForContents(state buildkitllb.State, contents config.ContentsConfig, privileged bool) buildkitllb.State {
 	for _, step := range contents.Pipeline {
 		name := step.Name
 		if name == "" {
@@ -261,13 +252,13 @@ func (g *Generator) runPipelineForContents(state buildkitllb.State, contents con
 		}
 		state = state.Run(opts...).Root()
 	}
-	return state, nil
+	return state
 }
 
 // setupPathsForContents runs commands to generate explicit paths for a specific contents config.
-func (g *Generator) setupPathsForContents(state buildkitllb.State, contents config.ContentsConfig) (buildkitllb.State, error) {
+func (g *Generator) setupPathsForContents(state buildkitllb.State, contents config.ContentsConfig) buildkitllb.State {
 	if len(contents.Paths) == 0 {
-		return state, nil
+		return state
 	}
 
 	var commands []string
@@ -282,13 +273,13 @@ func (g *Generator) setupPathsForContents(state buildkitllb.State, contents conf
 	}
 
 	if len(commands) == 0 {
-		return state, nil
+		return state
 	}
 
 	return state.Run(
 		buildkitllb.Args([]string{"/bin/sh", "-c", strings.Join(commands, " && ")}),
 		buildkitllb.WithCustomName("setup explicit paths"),
-	).Root(), nil
+	).Root()
 }
 
 // applyRuntime sets user, workdir, and environment on the final state.
