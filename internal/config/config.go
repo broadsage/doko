@@ -121,11 +121,19 @@ type PolicyConfig struct {
 	VEX             VEXConfig `yaml:"vex"               json:"vex,omitempty"`
 }
 
+// PipelineSecret represents a BuildKit secret mount option.
+type PipelineSecret struct {
+	ID     string `yaml:"id"     json:"id"`
+	Target string `yaml:"target" json:"target"`
+}
+
 // PipelineStep represents a single build script runner.
 type PipelineStep struct {
-	Name string `yaml:"name,omitempty" json:"name,omitempty"`
-	Runs string `yaml:"runs"           json:"runs"`
-	SSH  bool   `yaml:"ssh,omitempty"  json:"ssh,omitempty"`
+	Name    string           `yaml:"name,omitempty" json:"name,omitempty"`
+	Runs    string           `yaml:"runs"           json:"runs"`
+	SSH     bool             `yaml:"ssh,omitempty"  json:"ssh,omitempty"`
+	Secrets []PipelineSecret `yaml:"secrets,omitempty" json:"secrets,omitempty"`
+	Network string           `yaml:"network,omitempty" json:"network,omitempty"`
 }
 
 // ContentsConfig lists packages and local files to include.

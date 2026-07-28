@@ -196,3 +196,32 @@ func TestGenerate_SubBuildWithCACertificates(t *testing.T) {
 		t.Fatalf("failed to generate LLB definition with subbuild CA certificates: %v", err)
 	}
 }
+
+func TestGenerate_WithSecretsAndNetwork(t *testing.T) {
+	spec := &config.Spec{
+		Name:     "secrets-network-app",
+		Provider: "apk",
+		Base:     "alpine-3.23",
+		Contents: config.ContentsConfig{
+			Pipeline: []config.PipelineStep{
+				{
+					Name: "test-pipeline",
+					Runs: "echo hello",
+					Secrets: []config.PipelineSecret{
+						{
+							ID:     "mysecret",
+							Target: "/run/secrets/mysecret",
+						},
+					},
+					Network: "none",
+				},
+			},
+		},
+	}
+	g := NewGenerator(spec)
+	ctx := context.Background()
+	_, err := g.Generate(ctx)
+	if err != nil {
+		t.Fatalf("failed to generate LLB definition with secrets and network: %v", err)
+	}
+}

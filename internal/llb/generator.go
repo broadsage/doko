@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
+	"github.com/moby/buildkit/solver/pb"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/broadsage/doko/internal/config"
@@ -252,7 +253,20 @@ func (g *Generator) runPipelineForContents(state buildkitllb.State, contents con
 			opts = append(opts, buildkitllb.AddSSHSocket(buildkitllb.SSHID("default"), buildkitllb.SSHSocketTarget("/run/ssh-agent.sock")))
 			opts = append(opts, buildkitllb.AddEnv("SSH_AUTH_SOCK", "/run/ssh-agent.sock"))
 		}
-		state = state.Run(opts...).Root()
+		for _, sec := range step.Secrets {
+			opts = append(opts, buildkitllb.AddSecret(sec.Target, buildkitllb.SecretID(sec.ID)))
+		}
+
+		stepState := state
+		if step.Network != "" {
+			switch strings.ToLower(step.Network) {
+			case "none":
+				stepState = stepState.Network(pb.NetMode_NONE)
+			case "host":
+				stepState = stepState.Network(pb.NetMode_HOST)
+			}
+		}
+		state = stepState.Run(opts...).Root()
 	}
 	return state
 }
