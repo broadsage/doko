@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -105,11 +106,13 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 	}
 
 	var caCerts [][]byte
+	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
+	caClient := &http.Client{Timeout: timeoutDuration}
 	for _, certPath := range spec.Contents.CACertificates {
 		if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, certPath, nil)
 			if err == nil {
-				resp, err := http.DefaultClient.Do(req)
+				resp, err := caClient.Do(req)
 				if err == nil && resp.StatusCode == http.StatusOK {
 					defer func() { _ = resp.Body.Close() }()
 					if data, err := io.ReadAll(resp.Body); err == nil {
@@ -172,7 +175,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 		if len(parts) > 2 {
 			variant = parts[2]
 		}
-		
+
 		plat := Platform{
 			ID: p,
 		}
@@ -207,11 +210,13 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 // buildPlatformResult compiles and solves the image filesystem and metadata for a given target architecture.
 func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, vexData []byte, lockedPkgs map[string]string, caCerts [][]byte) (*client.Result, error) {
 	// 1. Construct a resolver for the specified package provider.
+	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
 	res, err := resolver.NewResolver(spec.Provider, resolver.Options{
 		Arch:           spec.Arch,
 		Repositories:   spec.Contents.Repositories,
 		LockedPackages: lockedPkgs,
 		CACerts:        caCerts,
+		Timeout:        timeoutDuration,
 	})
 	if err != nil {
 		return nil, err
@@ -234,6 +239,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 3. Evaluate security policies including real OSV.dev CVE scanning (compile-time gate).
 	gate := policy.NewGate(spec.Security.Policy.FailOnCVE, spec.Security.Policy.AllowedLicenses)
+	gate = gate.WithScanner(vulnerability.NewScannerWithTimeout(timeoutDuration))
 	if len(vexData) > 0 {
 		var matcher *vulnerability.VEXMatcher
 		var err error

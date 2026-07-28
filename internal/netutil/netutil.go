@@ -10,9 +10,9 @@ import (
 
 // NewHTTPClient returns a standardized HTTP client configured with timeouts
 // and optimal connection pooling parameters suitable for repository indexing.
-func NewHTTPClient() *http.Client {
+func NewHTTPClient(timeout time.Duration) *http.Client {
 	return &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: timeout,
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			IdleConnTimeout:     90 * time.Second,
@@ -22,7 +22,7 @@ func NewHTTPClient() *http.Client {
 }
 
 // NewHTTPClientWithCAs returns a standardized HTTP client loaded with a custom CA cert pool.
-func NewHTTPClientWithCAs(caPEMs [][]byte) *http.Client {
+func NewHTTPClientWithCAs(caPEMs [][]byte, timeout time.Duration) *http.Client {
 	pool, err := x509.SystemCertPool()
 	if err != nil || pool == nil {
 		pool = x509.NewCertPool()
@@ -41,7 +41,7 @@ func NewHTTPClientWithCAs(caPEMs [][]byte) *http.Client {
 	}
 
 	return &http.Client{
-		Timeout:   30 * time.Second,
+		Timeout:   timeout,
 		Transport: transport,
 	}
 }

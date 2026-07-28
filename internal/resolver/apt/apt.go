@@ -78,9 +78,9 @@ func newAPTResolver(opts resolver.Options) (resolver.Resolver, error) {
 
 	var httpClient *http.Client
 	if len(opts.CACerts) > 0 {
-		httpClient = netutil.NewHTTPClientWithCAs(opts.CACerts)
+		httpClient = netutil.NewHTTPClientWithCAs(opts.CACerts, opts.Timeout)
 	} else {
-		httpClient = netutil.NewHTTPClient()
+		httpClient = netutil.NewHTTPClient(opts.Timeout)
 	}
 
 	return &aptResolver{

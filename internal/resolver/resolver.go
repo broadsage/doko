@@ -1,9 +1,9 @@
-// Package resolver defines the interface and types for multi-OS package resolution.
 package resolver
 
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // Package represents a resolved dependency from any package ecosystem.
@@ -42,6 +42,7 @@ type Options struct {
 	CacheDir       string            // Local cache directory for index files
 	LockedPackages map[string]string // Pin package name -> exact version from doko.lock
 	CACerts        [][]byte          // Custom CA certificates PEM data
+	Timeout        time.Duration     // Custom HTTP client timeout
 }
 
 // LockedPackage represents a pinned package version from a lockfile.

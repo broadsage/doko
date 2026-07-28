@@ -13,29 +13,30 @@ import (
 // Spec defines the top-level schema of doko.yaml.
 // It is the single source of truth for every field the build system accepts.
 type Spec struct {
-	Name        string            `yaml:"name"      json:"name"`
-	Image       string            `yaml:"image"     json:"image,omitempty"`
-	Variant     string            `yaml:"variant"   json:"variant,omitempty"`
-	Tags        []string          `yaml:"tags"      json:"tags,omitempty"`
-	Platforms   []string          `yaml:"platforms" json:"platforms,omitempty"`
-	Dates       map[string]string `yaml:"dates"     json:"dates,omitempty"`
-	Vars        map[string]string `yaml:"vars"      json:"vars,omitempty"`
-	Provider    string            `yaml:"-"         json:"provider,omitempty"`
-	Base        string            `yaml:"-"         json:"base,omitempty"`
-	Arch        string            `yaml:"arch"      json:"arch,omitempty"` // amd64, arm64 — defaults to amd64
-	Security    SecurityConfig    `yaml:"security"  json:"security"`
-	Contents    ContentsConfig    `yaml:"contents"  json:"contents"`
-	Builds      []SubBuild        `yaml:"builds"    json:"builds,omitempty"`
-	Runtime     RuntimeConfig     `yaml:"runtime"   json:"runtime"`
-	Accounts    AccountsConfig    `yaml:"accounts"  json:"accounts,omitempty"`
-	Environment map[string]string `yaml:"environment" json:"environment,omitempty"`
-	Annotations map[string]string `yaml:"annotations" json:"annotations,omitempty"`
-	OSRelease   OSReleaseConfig   `yaml:"os-release" json:"os-release,omitempty"`
-	StopSignal  string            `yaml:"stop-signal" json:"stop-signal,omitempty"`
-	Artifacts   []ArtifactConfig  `yaml:"artifacts"   json:"artifacts,omitempty"`
-	WorkDir     string            `yaml:"work-dir"    json:"work-dir,omitempty"`
-	EntryPoint  []string          `yaml:"entrypoint"  json:"entrypoint,omitempty"`
-	Cmd         []string          `yaml:"cmd"         json:"cmd,omitempty"`
+	Name           string            `yaml:"name"      json:"name"`
+	Image          string            `yaml:"image"     json:"image,omitempty"`
+	Variant        string            `yaml:"variant"   json:"variant,omitempty"`
+	Tags           []string          `yaml:"tags"      json:"tags,omitempty"`
+	Platforms      []string          `yaml:"platforms" json:"platforms,omitempty"`
+	Dates          map[string]string `yaml:"dates"     json:"dates,omitempty"`
+	Vars           map[string]string `yaml:"vars"      json:"vars,omitempty"`
+	Provider       string            `yaml:"-"         json:"provider,omitempty"`
+	Base           string            `yaml:"-"         json:"base,omitempty"`
+	Arch           string            `yaml:"arch"      json:"arch,omitempty"` // amd64, arm64 — defaults to amd64
+	Security       SecurityConfig    `yaml:"security"  json:"security"`
+	Contents       ContentsConfig    `yaml:"contents"  json:"contents"`
+	Builds         []SubBuild        `yaml:"builds"    json:"builds,omitempty"`
+	Runtime        RuntimeConfig     `yaml:"runtime"   json:"runtime"`
+	Accounts       AccountsConfig    `yaml:"accounts"  json:"accounts,omitempty"`
+	Environment    map[string]string `yaml:"environment" json:"environment,omitempty"`
+	Annotations    map[string]string `yaml:"annotations" json:"annotations,omitempty"`
+	OSRelease      OSReleaseConfig   `yaml:"os-release" json:"os-release,omitempty"`
+	StopSignal     string            `yaml:"stop-signal" json:"stop-signal,omitempty"`
+	Artifacts      []ArtifactConfig  `yaml:"artifacts"   json:"artifacts,omitempty"`
+	WorkDir        string            `yaml:"work-dir"    json:"work-dir,omitempty"`
+	EntryPoint     []string          `yaml:"entrypoint"  json:"entrypoint,omitempty"`
+	Cmd            []string          `yaml:"cmd"         json:"cmd,omitempty"`
+	TimeoutSeconds int               `yaml:"timeout-seconds" json:"timeout-seconds,omitempty"`
 }
 
 // OSReleaseConfig defines fields for customizing /etc/os-release inside the image.
@@ -274,6 +275,10 @@ func ParseOSRelease() (string, string, error) {
 // Validate checks the Spec for correctness and applies defaults.
 func (s *Spec) Validate() error {
 	var errs []string
+
+	if s.TimeoutSeconds <= 0 {
+		s.TimeoutSeconds = 30
+	}
 
 	if s.Name == "" {
 		errs = append(errs, "name is required")
