@@ -385,10 +385,24 @@ func (g *Generator) setupAccounts(state buildkitllb.State) buildkitllb.State {
 		return state
 	}
 
-	return state.Run(
+	// 1. Run the accounts creation script inside a helper stage
+	helperState := state.Run(
 		buildkitllb.Args([]string{"/bin/sh", "-c", strings.Join(commands, " && ")}),
-		buildkitllb.WithCustomName("add users and groups"),
+		buildkitllb.WithCustomName("provision user and group accounts"),
 	).Root()
+
+	// 2. Copy back files natively to the main stage to create a clean, named layer
+	fileAction := buildkitllb.Copy(helperState, "/etc/passwd", "/etc/passwd")
+	fileAction = fileAction.Copy(helperState, "/etc/group", "/etc/group")
+	fileAction = fileAction.Copy(helperState, "/etc/shadow", "/etc/shadow")
+	fileAction = fileAction.Copy(helperState, "/root", "/root", &buildkitllb.CopyInfo{CreateDestPath: true})
+
+	for _, user := range g.Spec.Accounts.Users {
+		homeDir := fmt.Sprintf("/home/%s", user.Name)
+		fileAction = fileAction.Copy(helperState, homeDir, homeDir, &buildkitllb.CopyInfo{CreateDestPath: true})
+	}
+
+	return state.File(fileAction, buildkitllb.WithCustomName("add users and groups"))
 }
 
 // setupDirectories creates each directory path as an individual layer using native BuildKit Mkdir.
