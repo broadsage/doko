@@ -448,6 +448,7 @@ contents:
 |---|---|---|
 | `name` | `string` | Human-readable label for this step. Shown in BuildKit build logs. |
 | `runs` | `string` | Required. Shell script executed via `/bin/sh -c`. |
+| `ssh` | `boolean` | Optional. Set to `true` to mount the host's forwarded SSH agent socket securely at `/run/ssh-agent.sock` and set the `SSH_AUTH_SOCK` environment variable. |
 
 > **Best Practice:** Do not use `pipeline` to create directories or set ownership — use `paths:` for those. Reserve `pipeline` for logic that genuinely requires shell execution.
 
