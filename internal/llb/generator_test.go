@@ -171,3 +171,28 @@ func TestGenerate_NginxConfig(t *testing.T) {
 		t.Fatalf("failed to generate LLB definition for nginx config: %v", err)
 	}
 }
+
+func TestGenerate_SubBuildWithCACertificates(t *testing.T) {
+	spec := &config.Spec{
+		Name:     "subbuild-ca-app",
+		Provider: "apk",
+		Base:     "alpine-3.23",
+		Builds: []config.SubBuild{
+			{
+				Name:     "builder-stage",
+				Provider: "apk",
+				Base:     "alpine-3.23",
+				Contents: config.ContentsConfig{
+					Packages:       []string{"curl"},
+					CACertificates: []string{"https://example.com/custom-ca.crt"},
+				},
+			},
+		},
+	}
+	g := NewGenerator(spec)
+	ctx := context.Background()
+	_, err := g.Generate(ctx)
+	if err != nil {
+		t.Fatalf("failed to generate LLB definition with subbuild CA certificates: %v", err)
+	}
+}

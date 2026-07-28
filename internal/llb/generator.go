@@ -50,11 +50,13 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 	// 2. Bootstrap base OS layout starting from scratch to drop parent history
 	base := g.bootstrapBaseLayout(platform, baseRef)
 
-	// 2.1. Copy keyrings and CA certificates (Coalesced)
-	state := g.copyKeyringsAndCAs(base)
+	// 2.1. Copy keyrings and CA certificates
+	state, hasCAs := configureKeysAndCAs(base, g.Spec.Provider, g.Spec.Contents)
 
 	// 2.15. Update CA certificates run (if any were copied)
-	state = g.runUpdateCAs(state)
+	if hasCAs {
+		state = runUpdateCAsFor(state, g.Spec.Provider)
+	}
 
 	// 2.2. Install packages via the appropriate package manager.
 	state, err := g.installPackages(state)
@@ -62,22 +64,37 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 		return nil, fmt.Errorf("package installation failed: %w", err)
 	}
 
-	// 2.5. Configure accounts, paths and OS-level hardening (Coalesced Run Layer)
-	state = g.consolidateSystemSetup(state)
+	// 3. Add users and groups (individual layer)
+	state = g.setupAccounts(state)
 
-	// 3. Run pipeline steps if any.
+	// 4. Create directories (individual layer per directory)
+	state = g.setupDirectories(state)
+
+	// 5. Security hardening (individual layer)
+	state = g.applyHardening(state)
+
+	// 6. Run pipeline steps if any (already individual layers per step).
 	state, err = g.runPipeline(state)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline execution failed: %w", err)
 	}
 
-	// 4. Write config metadata, copy local files, outputs, and artifacts (Coalesced File Layer)
-	state = g.consolidateAppFiles(state, subBuilds)
+	// 7. Copy local files (individual layer per file)
+	state = g.copyLocalFiles(state)
 
-	// 5. Apply runtime configuration (user, workdir, env, entrypoint).
+	// 8. Merge outputs from sub-builds (individual layer per sub-build)
+	state = g.mergeSubBuildOutputs(state, subBuilds)
+
+	// 9. Import artifacts from external images (individual layer per artifact)
+	state = g.importArtifacts(state)
+
+	// 10. Write metadata files: os-release, sysctl (individual layer)
+	state = g.writeMetadataFiles(state)
+
+	// 11. Apply runtime configuration (user, workdir, env, entrypoint).
 	state = g.applyRuntime(state)
 
-	// 6. Marshal the final LLB state into a serializable Definition.
+	// 12. Marshal the final LLB state into a serializable Definition.
 	dt, err := state.Marshal(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal LLB state: %w", err)
@@ -115,7 +132,13 @@ func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b 
 	// Bootstrap per-stage base layout starting from scratch
 	base := g.bootstrapBaseLayout(platform, stageBaseRef)
 
-	state, err := g.installPackagesForContentsWithProvider(base, b.Contents, provider)
+	// Configure keyrings and custom CA certificates for the sub-stage
+	state, hasCAs := configureKeysAndCAs(base, provider, b.Contents)
+	if hasCAs {
+		state = runUpdateCAsFor(state, provider)
+	}
+
+	state, err := g.installPackagesForContentsWithProvider(state, b.Contents, provider)
 	if err != nil {
 		return buildkitllb.State{}, err
 	}
@@ -135,16 +158,7 @@ func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b 
 
 // resolveBaseImage maps the provider + base fields to a container image reference.
 func (g *Generator) resolveBaseImage() string {
-	switch g.Spec.Provider {
-	case "apk":
-		return fmt.Sprintf("alpine:%s", sanitizeBaseTag(g.Spec.Base))
-	case "apt":
-		return fmt.Sprintf("debian:%s-slim", sanitizeBaseTag(g.Spec.Base))
-	case "dnf":
-		return fmt.Sprintf("fedora:%s", sanitizeBaseTag(g.Spec.Base))
-	default:
-		return g.Spec.Base
-	}
+	return resolveBaseImageFor(g.Spec.Provider, g.Spec.Base)
 }
 
 // installPackages runs the package manager commands for the primary contents config.
@@ -152,34 +166,10 @@ func (g *Generator) installPackages(base buildkitllb.State) (buildkitllb.State, 
 	return g.installPackagesForContentsWithProvider(base, g.Spec.Contents, g.Spec.Provider)
 }
 
-// installPackagesForContentsWithProvider runs the package manager commands for a specific
-// contents config using the given provider.
-func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.State, contents config.ContentsConfig, provider string) (buildkitllb.State, error) {
-	// 1. Copy any custom keyring files first
-	for i, keyURL := range contents.Keyring {
-		filename := fmt.Sprintf("key-%d.pub", i)
-		if parts := strings.Split(keyURL, "/"); len(parts) > 0 {
-			filename = parts[len(parts)-1]
-		}
-		var dest string
-		switch provider {
-		case "apk":
-			dest = "/etc/apk/keys/" + filename
-		case "apt":
-			dest = "/etc/apt/trusted.gpg.d/" + filename
-		case "dnf":
-			dest = "/etc/pki/rpm-gpg/" + filename
-		}
-		if dest != "" {
-			keyState := buildkitllb.HTTP(keyURL)
-			base = base.File(
-				// BuildKit HTTP sources place the downloaded file at "/<basename>" in their
-				// virtual filesystem. We must copy from that specific path, not from "/",
-				// to avoid copying the directory root instead of the file.
-				buildkitllb.Copy(keyState, "/"+filename, dest, &buildkitllb.CopyInfo{CreateDestPath: true}),
-				buildkitllb.WithCustomName(fmt.Sprintf("copy keyring %s", filename)),
-			)
-		}
+func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.State, contents config.ContentsConfig, providerName string) (buildkitllb.State, error) {
+	p, err := GetProvider(providerName)
+	if err != nil {
+		return base, err
 	}
 
 	var installs []string
@@ -198,37 +188,17 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 		return base, nil
 	}
 
-	var script string
-	switch provider {
-	case "apk":
-		if len(installs) > 0 {
-			script += "apk add --no-cache " + strings.Join(installs, " ") + "\n"
-		}
-		if len(removals) > 0 {
-			script += "apk del --no-cache " + strings.Join(removals, " ") + "\n"
-		}
-	case "apt":
-		if len(installs) > 0 {
-			script += "apt-get update && apt-get install -y --no-install-recommends " + strings.Join(installs, " ") + " && rm -rf /var/lib/apt/lists/*\n"
-		}
-		if len(removals) > 0 {
-			script += "apt-get purge -y " + strings.Join(removals, " ") + " && apt-get autoremove -y\n"
-		}
-	case "dnf":
-		if len(installs) > 0 {
-			script += "dnf install -y --setopt=install_weak_deps=False " + strings.Join(installs, " ") + " && dnf clean all\n"
-		}
-		if len(removals) > 0 {
-			script += "dnf remove -y " + strings.Join(removals, " ") + " && dnf clean all\n"
-		}
-	default:
-		return base, fmt.Errorf("unsupported provider: %s", provider)
+	script := p.InstallScript(installs, removals)
+	if script == "" {
+		return base, nil
 	}
 
-	return base.Run(
-		buildkitllb.Args([]string{"/bin/sh", "-c", strings.TrimSpace(script)}),
-		buildkitllb.WithCustomName(fmt.Sprintf("manage packages via %s", provider)),
-	).Root(), nil
+	var runOpts []buildkitllb.RunOption
+	runOpts = append(runOpts, buildkitllb.Args([]string{"/bin/sh", "-c", strings.TrimSpace(script)}))
+	runOpts = append(runOpts, buildkitllb.WithCustomName(fmt.Sprintf("manage packages via %s", providerName)))
+	runOpts = append(runOpts, p.CacheMounts()...)
+
+	return base.Run(runOpts...).Root(), nil
 }
 
 // runPipeline executes any custom pipeline shell commands for the primary spec.
@@ -253,11 +223,6 @@ func (g *Generator) runPipelineForContents(state buildkitllb.State, contents con
 		state = state.Run(opts...).Root()
 	}
 	return state, nil
-}
-
-// setupPaths runs the commands to generate explicitly declared paths.
-func (g *Generator) setupPaths(state buildkitllb.State) (buildkitllb.State, error) {
-	return g.setupPathsForContents(state, g.Spec.Contents)
 }
 
 // setupPathsForContents runs commands to generate explicit paths for a specific contents config.
@@ -287,66 +252,6 @@ func (g *Generator) setupPathsForContents(state buildkitllb.State, contents conf
 	).Root(), nil
 }
 
-// mergeOutputs adds COPY operations for each output declared by sub-builds.
-func (g *Generator) mergeOutputs(state buildkitllb.State, subBuilds map[string]buildkitllb.State) buildkitllb.State {
-	for _, b := range g.Spec.Builds {
-		stageState, ok := subBuilds[b.Name]
-		if !ok {
-			continue
-		}
-		for _, out := range b.Outputs {
-			state = state.File(
-				buildkitllb.Copy(
-					stageState, out.Source, out.Target,
-					&buildkitllb.CopyInfo{
-						CreateDestPath: true,
-					},
-				),
-				buildkitllb.WithCustomName(fmt.Sprintf("extract %s from %s", out.Source, b.Name)),
-			)
-		}
-	}
-	return state
-}
-
-// importArtifacts imports files directly from external OCI images.
-func (g *Generator) importArtifacts(state buildkitllb.State) buildkitllb.State {
-	for _, artifact := range g.Spec.Artifacts {
-		srcState := buildkitllb.Image(artifact.Name)
-		for _, inc := range artifact.Includes {
-			state = state.File(
-				buildkitllb.Copy(
-					srcState, inc, inc,
-					&buildkitllb.CopyInfo{
-						CreateDestPath: true,
-					},
-				),
-				buildkitllb.WithCustomName(fmt.Sprintf("import artifact %s from %s", inc, artifact.Name)),
-			)
-		}
-	}
-	return state
-}
-
-// copyLocalPaths adds COPY operations for paths referencing local files.
-func (g *Generator) copyLocalPaths(state buildkitllb.State) buildkitllb.State {
-	for _, p := range g.Spec.Contents.Paths {
-		if (p.Type == "file" || p.Type == "") && p.Source != "" {
-			srcState := buildkitllb.Local("context", buildkitllb.SharedKeyHint(p.Source))
-			state = state.File(
-				buildkitllb.Copy(
-					srcState, p.Source, p.Path,
-					&buildkitllb.CopyInfo{
-						CreateDestPath: true,
-					},
-				),
-				buildkitllb.WithCustomName(fmt.Sprintf("copy %s -> %s", p.Source, p.Path)),
-			)
-		}
-	}
-	return state
-}
-
 // applyRuntime sets user, workdir, and environment on the final state.
 func (g *Generator) applyRuntime(state buildkitllb.State) buildkitllb.State {
 	user := g.Spec.Runtime.User
@@ -362,46 +267,6 @@ func (g *Generator) applyRuntime(state buildkitllb.State) buildkitllb.State {
 	for key, val := range g.Spec.Runtime.Env {
 		state = state.AddEnv(key, val)
 	}
-	return state
-}
-
-// setupAccounts configures the declarative users and groups inside the container.
-func (g *Generator) setupAccounts(state buildkitllb.State) buildkitllb.State {
-	if len(g.Spec.Accounts.Users) == 0 && len(g.Spec.Accounts.Groups) == 0 && !g.Spec.Accounts.Root {
-		return state
-	}
-
-	var commands []string
-
-	// Enforce root access based on the Root boolean
-	if !g.Spec.Accounts.Root {
-		// Harden image: remove root user and group
-		commands = append(commands, "sed -i '/^root:/d' /etc/passwd /etc/group /etc/shadow 2>/dev/null || true")
-	} else {
-		// Ensure root exists (useful if base image was scratch/distroless)
-		commands = append(commands, "if ! grep -q '^root:' /etc/passwd; then echo 'root:x:0:0:root:/root:/bin/sh' >> /etc/passwd; fi")
-		commands = append(commands, "if ! grep -q '^root:' /etc/group; then echo 'root:x:0:root' >> /etc/group; fi")
-		commands = append(commands, "mkdir -p /root && chown 0:0 /root 2>/dev/null || true")
-	}
-
-	// Setup groups: name:x:gid:members
-	for _, group := range g.Spec.Accounts.Groups {
-		commands = append(commands, fmt.Sprintf("echo %s:x:%d:%s >> /etc/group", group.Name, group.GID, strings.Join(group.Members, ",")))
-	}
-
-	// Setup users: name:x:uid:gid:name:/home/name:/sbin/nologin
-	for _, user := range g.Spec.Accounts.Users {
-		commands = append(commands, fmt.Sprintf("echo %s:x:%d:%d:%s:/home/%s:/sbin/nologin >> /etc/passwd", user.Name, user.UID, user.GID, user.Name, user.Name))
-		// Create home directory for the user
-		commands = append(commands, fmt.Sprintf("mkdir -p /home/%s && chown -R %d:%d /home/%s", user.Name, user.UID, user.GID, user.Name))
-	}
-
-	cmdStr := strings.Join(commands, " && ")
-	state = state.Run(
-		buildkitllb.Args([]string{"/bin/sh", "-c", cmdStr}),
-		buildkitllb.WithCustomName("setup user and group accounts"),
-	).Root()
-
 	return state
 }
 
@@ -424,17 +289,12 @@ func sanitizeBaseTag(base string) string {
 
 // resolveBaseImageFor maps a provider + base combo to a container image reference.
 // Used for sub-builds that override the top-level base.
-func resolveBaseImageFor(provider, base string) string {
-	switch provider {
-	case "apk":
-		return fmt.Sprintf("alpine:%s", sanitizeBaseTag(base))
-	case "apt":
-		return fmt.Sprintf("debian:%s-slim", sanitizeBaseTag(base))
-	case "dnf":
-		return fmt.Sprintf("fedora:%s", sanitizeBaseTag(base))
-	default:
+func resolveBaseImageFor(providerName, base string) string {
+	p, err := GetProvider(providerName)
+	if err != nil {
 		return base
 	}
+	return p.ResolveBaseImage(base)
 }
 
 // bootstrapBaseLayout packages the base image rootfs into an archive at build time
@@ -473,106 +333,10 @@ func (g *Generator) bootstrapBaseLayout(platform ocispecs.Platform, baseRef stri
 	return unpackRun.GetMount("/rootfs")
 }
 
-// writeOSRelease writes a customized /etc/os-release file onto the target state
-// using values from the spec's os-release configuration.
-func (g *Generator) writeOSRelease(state buildkitllb.State) buildkitllb.State {
-	cfg := g.Spec.OSRelease
-	if cfg.Name == "" && cfg.ID == "" {
-		return state // Omitted, retain default OS release
-	}
-
-	var sb strings.Builder
-	if cfg.Name != "" {
-		_, _ = fmt.Fprintf(&sb, "NAME=%q\n", cfg.Name)
-	}
-	if cfg.ID != "" {
-		_, _ = fmt.Fprintf(&sb, "ID=%q\n", cfg.ID)
-	}
-	if cfg.VersionID != "" {
-		_, _ = fmt.Fprintf(&sb, "VERSION_ID=%q\n", cfg.VersionID)
-	}
-	if cfg.VersionCodename != "" {
-		_, _ = fmt.Fprintf(&sb, "VERSION_CODENAME=%q\n", cfg.VersionCodename)
-	}
-	if cfg.PrettyName != "" {
-		_, _ = fmt.Fprintf(&sb, "PRETTY_NAME=%q\n", cfg.PrettyName)
-	}
-	if cfg.HomeURL != "" {
-		_, _ = fmt.Fprintf(&sb, "HOME_URL=%q\n", cfg.HomeURL)
-	}
-	if cfg.BugReportURL != "" {
-		_, _ = fmt.Fprintf(&sb, "BUG_REPORT_URL=%q\n", cfg.BugReportURL)
-	}
-
-	// Overwrite /etc/os-release inside the image
-	contentState := buildkitllb.Scratch().File(
-		buildkitllb.Mkfile("/os-release", 0o644, []byte(sb.String())),
-	)
-	return state.File(
-		buildkitllb.Copy(contentState, "/os-release", "/etc/os-release"),
-		buildkitllb.WithCustomName("add metadata"),
-	)
-}
-
-// copyCACertificates imports and configures custom CA certificates inside the target image.
-func (g *Generator) copyCACertificates(state buildkitllb.State) buildkitllb.State {
-	for i, certPath := range g.Spec.Contents.CACertificates {
-		filename := fmt.Sprintf("ca-%d.crt", i)
-		if parts := strings.Split(certPath, "/"); len(parts) > 0 {
-			filename = parts[len(parts)-1]
-		}
-
-		var dest string
-		switch g.Spec.Provider {
-		case "apk", "apt":
-			dest = "/usr/local/share/ca-certificates/" + filename
-		case "dnf":
-			dest = "/etc/pki/ca-trust/source/anchors/" + filename
-		}
-
-		if dest != "" {
-			var srcState buildkitllb.State
-			var srcPath string
-			if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
-				srcState = buildkitllb.HTTP(certPath)
-				// BuildKit HTTP sources place the file at "/<basename>" — use that, not the full URL.
-				srcPath = "/" + filename
-			} else {
-				srcState = buildkitllb.Local("context", buildkitllb.SharedKeyHint(certPath))
-				srcPath = certPath
-			}
-
-			state = state.File(
-				buildkitllb.Copy(srcState, srcPath, dest, &buildkitllb.CopyInfo{CreateDestPath: true}),
-				buildkitllb.WithCustomName(fmt.Sprintf("copy custom ca %s", filename)),
-			)
-		}
-	}
-
-	// Run update-ca-certificates to register the new CAs
-	var updateCmd []string
-	switch g.Spec.Provider {
-	case "apk", "apt":
-		updateCmd = []string{"update-ca-certificates"}
-	case "dnf":
-		updateCmd = []string{"update-ca-trust"}
-	}
-
-	if len(g.Spec.Contents.CACertificates) > 0 && len(updateCmd) > 0 {
-		state = state.Run(
-			buildkitllb.Args(updateCmd),
-			buildkitllb.WithCustomName("update-ca-certificates"),
-		).Root()
-	}
-
-	return state
-}
-
-// consolidateSystemSetup combines user accounts setup, directory paths, and package manager removal / shell locking into a single shell execution.
-func (g *Generator) consolidateSystemSetup(state buildkitllb.State) buildkitllb.State {
+// setupAccounts creates user accounts and groups as an individual layer.
+func (g *Generator) setupAccounts(state buildkitllb.State) buildkitllb.State {
 	var commands []string
 
-	// 1. Accounts Configuration
 	if len(g.Spec.Accounts.Users) > 0 || len(g.Spec.Accounts.Groups) > 0 || g.Spec.Accounts.Root || !g.Spec.Accounts.Root {
 		if !g.Spec.Accounts.Root {
 			commands = append(commands, "sed -i '/^root:/d' /etc/passwd /etc/group /etc/shadow 2>/dev/null || true")
@@ -590,45 +354,180 @@ func (g *Generator) consolidateSystemSetup(state buildkitllb.State) buildkitllb.
 		}
 	}
 
-	// 2. Directory Paths Configuration
-	for _, p := range g.Spec.Contents.Paths {
-		if p.Type == "directory" || p.Type == "dir" {
-			commands = append(commands, fmt.Sprintf("mkdir -p %s", p.Path))
-			commands = append(commands, fmt.Sprintf("chown -R %d:%d %s", p.UID, p.GID, p.Path))
-			if p.Mode != "" {
-				commands = append(commands, fmt.Sprintf("chmod %s %s", p.Mode, p.Path))
-			}
-		}
-	}
-
-	// 3. Hardening Configurations
-	hcfg := g.Spec.Security.Hardening
-	if hcfg.RemovePackageManager {
-		switch g.Spec.Provider {
-		case "apk":
-			commands = append(commands, "rm -rf /sbin/apk /lib/apk /var/cache/apk /etc/apk")
-		case "apt":
-			commands = append(commands, "rm -rf /usr/bin/apt* /usr/bin/dpkg* /var/lib/apt /var/lib/dpkg /etc/apt")
-		case "dnf":
-			commands = append(commands, "rm -rf /usr/bin/dnf* /usr/bin/rpm* /var/lib/dnf /var/lib/rpm /etc/dnf")
-		}
-	}
-	if hcfg.LockShellAccounts {
-		commands = append(commands, "sed -i -E '/^root:/! s|:(/bin/[a-z]*sh)$|:/sbin/nologin|g' /etc/passwd || true")
-	}
-
 	if len(commands) == 0 {
 		return state
 	}
 
 	return state.Run(
 		buildkitllb.Args([]string{"/bin/sh", "-c", strings.Join(commands, " && ")}),
-		buildkitllb.WithCustomName("configure system accounts, directories and hardening"),
+		buildkitllb.WithCustomName("add users and groups"),
 	).Root()
 }
 
-// consolidateAppFiles gathers /etc/os-release writing, sysctl writing, local file copying, sub-stage output merging, and external artifact importing into a single chained FileAction transaction.
-func (g *Generator) consolidateAppFiles(state buildkitllb.State, subBuilds map[string]buildkitllb.State) buildkitllb.State {
+// setupDirectories creates each directory path as an individual layer using native BuildKit Mkdir.
+func (g *Generator) setupDirectories(state buildkitllb.State) buildkitllb.State {
+	for _, p := range g.Spec.Contents.Paths {
+		if p.Type == "directory" || p.Type == "dir" {
+			var mode os.FileMode = 0755
+			if p.Mode != "" {
+				var parsed uint32
+				if _, err := fmt.Sscanf(p.Mode, "%o", &parsed); err == nil && parsed != 0 {
+					mode = os.FileMode(parsed)
+				}
+			}
+			opts := []buildkitllb.MkdirOption{
+				buildkitllb.WithParents(true),
+			}
+			if p.UID != 0 || p.GID != 0 {
+				opts = append(opts, buildkitllb.WithUser(fmt.Sprintf("%d:%d", p.UID, p.GID)))
+			}
+			state = state.File(
+				buildkitllb.Mkdir(p.Path, mode, opts...),
+				buildkitllb.WithCustomName(fmt.Sprintf("mkdir %s", p.Path)),
+			)
+		}
+	}
+	return state
+}
+
+// applyHardening removes the package manager (using native BuildKit Rm) and locks shell accounts as individual layers.
+func (g *Generator) applyHardening(state buildkitllb.State) buildkitllb.State {
+	hcfg := g.Spec.Security.Hardening
+
+	// 1. Remove Package Manager natively
+	if hcfg.RemovePackageManager {
+		p, err := GetProvider(g.Spec.Provider)
+		if err == nil {
+			paths := p.RemovePaths()
+			if len(paths) > 0 {
+				var fileAction *buildkitllb.FileAction
+				for _, path := range paths {
+					if fileAction == nil {
+						fileAction = buildkitllb.Rm(path, buildkitllb.WithAllowNotFound(true), buildkitllb.WithAllowWildcard(true))
+					} else {
+						fileAction = fileAction.Rm(path, buildkitllb.WithAllowNotFound(true), buildkitllb.WithAllowWildcard(true))
+					}
+				}
+				if fileAction != nil {
+					state = state.File(fileAction, buildkitllb.WithCustomName("remove package manager files"))
+				}
+			}
+		}
+	}
+
+	// 2. Lock shell accounts (requires sed shell execution)
+	if hcfg.LockShellAccounts {
+		state = state.Run(
+			buildkitllb.Args([]string{"/bin/sh", "-c", "sed -i -E '/^root:/! s|:(/bin/[a-z]*sh)$|:/sbin/nologin|g' /etc/passwd || true"}),
+			buildkitllb.WithCustomName("lock shell accounts"),
+		).Root()
+	}
+
+	return state
+}
+
+// copyLocalFiles copies each local file path as an individual layer.
+func (g *Generator) copyLocalFiles(state buildkitllb.State) buildkitllb.State {
+	for _, p := range g.Spec.Contents.Paths {
+		if (p.Type == "file" || p.Type == "") && p.Source != "" {
+			srcState := buildkitllb.Local("context", buildkitllb.SharedKeyHint(p.Source))
+			var cOpt *buildkitllb.ChownOpt
+			var mOpt *buildkitllb.ChmodOpt
+			if p.UID != 0 || p.GID != 0 {
+				cOpt = &buildkitllb.ChownOpt{
+					User:  &buildkitllb.UserOpt{UID: p.UID},
+					Group: &buildkitllb.UserOpt{UID: p.GID},
+				}
+			}
+			if p.Mode != "" {
+				var mode uint32
+				_, _ = fmt.Sscanf(p.Mode, "%o", &mode)
+				if mode != 0 {
+					mOpt = &buildkitllb.ChmodOpt{Mode: os.FileMode(mode)}
+				}
+			}
+
+			copyInfo := &buildkitllb.CopyInfo{
+				CreateDestPath: true,
+				ChownOpt:       cOpt,
+				Mode:           mOpt,
+			}
+
+			state = state.File(
+				buildkitllb.Copy(srcState, p.Source, p.Path, copyInfo),
+				buildkitllb.WithCustomName(fmt.Sprintf("copy %s %s", p.Source, p.Path)),
+			)
+		}
+	}
+	return state
+}
+
+// mergeSubBuildOutputs copies outputs from each sub-build as an individual layer per sub-build.
+func (g *Generator) mergeSubBuildOutputs(state buildkitllb.State, subBuilds map[string]buildkitllb.State) buildkitllb.State {
+	for _, b := range g.Spec.Builds {
+		stageState, ok := subBuilds[b.Name]
+		if !ok || len(b.Outputs) == 0 {
+			continue
+		}
+
+		var fileAction *buildkitllb.FileAction
+		for _, out := range b.Outputs {
+			var cOpt *buildkitllb.ChownOpt
+			if out.UID != 0 || out.GID != 0 {
+				cOpt = &buildkitllb.ChownOpt{
+					User:  &buildkitllb.UserOpt{UID: out.UID},
+					Group: &buildkitllb.UserOpt{UID: out.GID},
+				}
+			}
+			copyInfo := &buildkitllb.CopyInfo{
+				CreateDestPath: true,
+				ChownOpt:       cOpt,
+			}
+			if fileAction == nil {
+				fileAction = buildkitllb.Copy(stageState, out.Source, out.Target, copyInfo)
+			} else {
+				fileAction = fileAction.Copy(stageState, out.Source, out.Target, copyInfo)
+			}
+		}
+		if fileAction != nil {
+			state = state.File(fileAction, buildkitllb.WithCustomName(fmt.Sprintf("build %s", b.Name)))
+		}
+	}
+	return state
+}
+
+// importArtifacts imports files from external OCI images as individual layers per artifact.
+func (g *Generator) importArtifacts(state buildkitllb.State) buildkitllb.State {
+	for _, artifact := range g.Spec.Artifacts {
+		srcState := buildkitllb.Image(artifact.Name)
+		var fileAction *buildkitllb.FileAction
+		for _, inc := range artifact.Includes {
+			var cOpt *buildkitllb.ChownOpt
+			if artifact.UID != 0 || artifact.GID != 0 {
+				cOpt = &buildkitllb.ChownOpt{
+					User:  &buildkitllb.UserOpt{UID: artifact.UID},
+					Group: &buildkitllb.UserOpt{UID: artifact.GID},
+				}
+			}
+			copyInfo := &buildkitllb.CopyInfo{
+				CreateDestPath: true,
+				ChownOpt:       cOpt,
+			}
+			if fileAction == nil {
+				fileAction = buildkitllb.Copy(srcState, inc, inc, copyInfo)
+			} else {
+				fileAction = fileAction.Copy(srcState, inc, inc, copyInfo)
+			}
+		}
+		if fileAction != nil {
+			state = state.File(fileAction, buildkitllb.WithCustomName(fmt.Sprintf("import artifact from %s", artifact.Name)))
+		}
+	}
+	return state
+}
+
+// writeMetadataFiles writes os-release and sysctl config as an individual layer.
+func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.State {
 	var fileAction *buildkitllb.FileAction
 
 	// 1. Write /etc/os-release
@@ -678,134 +577,28 @@ func (g *Generator) consolidateAppFiles(state buildkitllb.State, subBuilds map[s
 		}
 	}
 
-	// 3. Copy Local Paths (files)
-	for _, p := range g.Spec.Contents.Paths {
-		if (p.Type == "file" || p.Type == "") && p.Source != "" {
-			srcState := buildkitllb.Local("context", buildkitllb.SharedKeyHint(p.Source))
-			var cOpt *buildkitllb.ChownOpt
-			var mOpt *buildkitllb.ChmodOpt
-			if p.UID != 0 || p.GID != 0 {
-				cOpt = &buildkitllb.ChownOpt{
-					User:  &buildkitllb.UserOpt{UID: p.UID},
-					Group: &buildkitllb.UserOpt{UID: p.GID},
-				}
-			}
-			if p.Mode != "" {
-				var mode uint32
-				_, _ = fmt.Sscanf(p.Mode, "%o", &mode)
-				if mode != 0 {
-					mOpt = &buildkitllb.ChmodOpt{Mode: os.FileMode(mode)}
-				}
-			}
-
-			copyInfo := &buildkitllb.CopyInfo{
-				CreateDestPath: true,
-				ChownOpt:       cOpt,
-				Mode:           mOpt,
-			}
-
-			if fileAction == nil {
-				fileAction = buildkitllb.Copy(srcState, p.Source, p.Path, copyInfo)
-			} else {
-				fileAction = fileAction.Copy(srcState, p.Source, p.Path, copyInfo)
-			}
-		}
-	}
-
-	// 4. Merge outputs from sub-builds
-	for _, b := range g.Spec.Builds {
-		stageState, ok := subBuilds[b.Name]
-		if !ok {
-			continue
-		}
-		for _, out := range b.Outputs {
-			var cOpt *buildkitllb.ChownOpt
-			if out.UID != 0 || out.GID != 0 {
-				cOpt = &buildkitllb.ChownOpt{
-					User:  &buildkitllb.UserOpt{UID: out.UID},
-					Group: &buildkitllb.UserOpt{UID: out.GID},
-				}
-			}
-			copyInfo := &buildkitllb.CopyInfo{
-				CreateDestPath: true,
-				ChownOpt:       cOpt,
-			}
-			if fileAction == nil {
-				fileAction = buildkitllb.Copy(stageState, out.Source, out.Target, copyInfo)
-			} else {
-				fileAction = fileAction.Copy(stageState, out.Source, out.Target, copyInfo)
-			}
-		}
-	}
-
-	// 5. Import artifacts from external OCI images
-	for _, artifact := range g.Spec.Artifacts {
-		srcState := buildkitllb.Image(artifact.Name)
-		for _, inc := range artifact.Includes {
-			var cOpt *buildkitllb.ChownOpt
-			if artifact.UID != 0 || artifact.GID != 0 {
-				cOpt = &buildkitllb.ChownOpt{
-					User:  &buildkitllb.UserOpt{UID: artifact.UID},
-					Group: &buildkitllb.UserOpt{UID: artifact.GID},
-				}
-			}
-			copyInfo := &buildkitllb.CopyInfo{
-				CreateDestPath: true,
-				ChownOpt:       cOpt,
-			}
-			if fileAction == nil {
-				fileAction = buildkitllb.Copy(srcState, inc, inc, copyInfo)
-			} else {
-				fileAction = fileAction.Copy(srcState, inc, inc, copyInfo)
-			}
-		}
-	}
-
 	if fileAction != nil {
-		state = state.File(fileAction, buildkitllb.WithCustomName("copy application files, outputs, and artifacts"))
+		state = state.File(fileAction, buildkitllb.WithCustomName("add metadata"))
 	}
 	return state
 }
 
-// runUpdateCAs runs update-ca-certificates/update-ca-trust if custom CA certs are configured.
-func (g *Generator) runUpdateCAs(state buildkitllb.State) buildkitllb.State {
-	var updateCmd []string
-	switch g.Spec.Provider {
-	case "apk", "apt":
-		updateCmd = []string{"update-ca-certificates"}
-	case "dnf":
-		updateCmd = []string{"update-ca-trust"}
+// configureKeysAndCAs copies custom keys and CA certificates into a single consolidated FileAction layer.
+func configureKeysAndCAs(state buildkitllb.State, providerName string, contents config.ContentsConfig) (buildkitllb.State, bool) {
+	p, err := GetProvider(providerName)
+	if err != nil {
+		return state, false
 	}
-
-	if len(g.Spec.Contents.CACertificates) > 0 && len(updateCmd) > 0 {
-		state = state.Run(
-			buildkitllb.Args(updateCmd),
-			buildkitllb.WithCustomName("update-ca-certificates"),
-		).Root()
-	}
-
-	return state
-}
-
-// copyKeyringsAndCAs copies custom keys and CA certificates into a single consolidated FileAction layer.
-func (g *Generator) copyKeyringsAndCAs(state buildkitllb.State) buildkitllb.State {
 	var fileAction *buildkitllb.FileAction
+	hasCAs := false
 
 	// 1. Keyrings
-	for i, keyURL := range g.Spec.Contents.Keyring {
+	for i, keyURL := range contents.Keyring {
 		filename := fmt.Sprintf("key-%d.pub", i)
 		if parts := strings.Split(keyURL, "/"); len(parts) > 0 {
 			filename = parts[len(parts)-1]
 		}
-		var dest string
-		switch g.Spec.Provider {
-		case "apk":
-			dest = "/etc/apk/keys/" + filename
-		case "apt":
-			dest = "/etc/apt/trusted.gpg.d/" + filename
-		case "dnf":
-			dest = "/etc/pki/rpm-gpg/" + filename
-		}
+		dest := p.KeyringDest(filename)
 		if dest != "" {
 			keyState := buildkitllb.HTTP(keyURL)
 			if fileAction == nil {
@@ -817,20 +610,12 @@ func (g *Generator) copyKeyringsAndCAs(state buildkitllb.State) buildkitllb.Stat
 	}
 
 	// 2. CA Certificates
-	for i, certPath := range g.Spec.Contents.CACertificates {
+	for i, certPath := range contents.CACertificates {
 		filename := fmt.Sprintf("ca-%d.crt", i)
 		if parts := strings.Split(certPath, "/"); len(parts) > 0 {
 			filename = parts[len(parts)-1]
 		}
-
-		var dest string
-		switch g.Spec.Provider {
-		case "apk", "apt":
-			dest = "/usr/local/share/ca-certificates/" + filename
-		case "dnf":
-			dest = "/etc/pki/ca-trust/source/anchors/" + filename
-		}
-
+		dest := p.CACertDest(filename)
 		if dest != "" {
 			var srcState buildkitllb.State
 			var srcPath string
@@ -847,11 +632,28 @@ func (g *Generator) copyKeyringsAndCAs(state buildkitllb.State) buildkitllb.Stat
 			} else {
 				fileAction = fileAction.Copy(srcState, srcPath, dest, &buildkitllb.CopyInfo{CreateDestPath: true})
 			}
+			hasCAs = true
 		}
 	}
 
 	if fileAction != nil {
 		state = state.File(fileAction, buildkitllb.WithCustomName("copy keyring and CA certificates"))
+	}
+	return state, hasCAs
+}
+
+// runUpdateCAsFor runs update-ca-certificates/update-ca-trust for a given provider.
+func runUpdateCAsFor(state buildkitllb.State, providerName string) buildkitllb.State {
+	p, err := GetProvider(providerName)
+	if err != nil {
+		return state
+	}
+	updateCmd := p.UpdateCACertCommand()
+	if len(updateCmd) > 0 {
+		state = state.Run(
+			buildkitllb.Args(updateCmd),
+			buildkitllb.WithCustomName("update-ca-certificates"),
+		).Root()
 	}
 	return state
 }
