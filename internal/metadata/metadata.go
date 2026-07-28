@@ -9,12 +9,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moby/buildkit/frontend/gateway/client"
+
 	"github.com/broadsage/doko/internal/config"
 	"github.com/broadsage/doko/internal/provenance"
 	"github.com/broadsage/doko/internal/resolver"
 	"github.com/broadsage/doko/internal/sbom"
 	"github.com/broadsage/doko/internal/security"
-	"github.com/moby/buildkit/frontend/gateway/client"
 )
 
 // AttachAll generates SBOMs, SLSA provenance, sandbox profiles, and OCI image configurations,
@@ -84,11 +85,11 @@ func attachSBOMs(spec *config.Spec, packages []resolver.Package, result *client.
 func attachProvenance(spec *config.Spec, packages []resolver.Package, result *client.Result) error {
 	att, err := provenance.Generate(spec, packages)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate provenance: %w", err)
 	}
 	data, err := provenance.Marshal(att)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal provenance: %w", err)
 	}
 	result.AddMeta("doko.provenance-slsa", data)
 	return nil
@@ -101,11 +102,11 @@ func attachSecurityProfiles(spec *config.Spec, result *client.Result) error {
 		case "seccomp":
 			profile, err := security.GenerateSeccompProfile(spec.Contents.Packages, spec.Runtime.Ports)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to generate seccomp profile: %w", err)
 			}
 			data, err := security.MarshalSeccomp(profile)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to marshal seccomp profile: %w", err)
 			}
 			result.AddMeta("doko.seccomp-profile", data)
 
@@ -116,11 +117,11 @@ func attachSecurityProfiles(spec *config.Spec, result *client.Result) error {
 			}
 			llPolicy, err := security.GenerateLandlockPolicy(paths, true)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to generate landlock policy: %w", err)
 			}
 			data, err := security.MarshalLandlock(llPolicy)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to marshal landlock policy: %w", err)
 			}
 			result.AddMeta("doko.landlock-policy", data)
 		}

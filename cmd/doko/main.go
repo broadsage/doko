@@ -21,12 +21,10 @@ import (
 	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/policy"
 	"github.com/broadsage/doko/internal/resolver"
-	"github.com/broadsage/doko/internal/vulnerability"
-
-	// Import provider sub-packages for their init() side-effects (self-registration).
 	_ "github.com/broadsage/doko/internal/resolver/apk"
 	_ "github.com/broadsage/doko/internal/resolver/apt"
 	_ "github.com/broadsage/doko/internal/resolver/dnf"
+	"github.com/broadsage/doko/internal/vulnerability"
 
 	"github.com/moby/buildkit/frontend/dockerui"
 	"github.com/moby/buildkit/frontend/gateway/client"
@@ -71,8 +69,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 	// 3.5 Parse build arguments from client options and merge into spec.Vars
 	buildOpts := c.BuildOpts()
 	for k, v := range buildOpts.Opts {
-		if strings.HasPrefix(k, "build-arg:") {
-			argKey := strings.TrimPrefix(k, "build-arg:")
+		if argKey, cut := strings.CutPrefix(k, "build-arg:"); cut {
 			if spec.Vars == nil {
 				spec.Vars = make(map[string]string)
 			}
