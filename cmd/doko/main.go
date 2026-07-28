@@ -211,12 +211,32 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, vexData []byte, lockedPkgs map[string]string, caCerts [][]byte) (*client.Result, error) {
 	// 1. Construct a resolver for the specified package provider.
 	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
+
+	osVersion := spec.Base
+	for _, prefix := range []string{"debian-", "alpine-", "fedora-"} {
+		if remainder, cut := strings.CutPrefix(osVersion, prefix); cut {
+			osVersion = remainder
+			for _, suffix := range []string{"-minimal", "-slim", "-base"} {
+				osVersion = strings.TrimSuffix(osVersion, suffix)
+			}
+			// Truncate Alpine point releases (e.g. 3.23.5 -> 3.23)
+			if prefix == "alpine-" {
+				parts := strings.Split(osVersion, ".")
+				if len(parts) > 2 {
+					osVersion = parts[0] + "." + parts[1]
+				}
+			}
+			break
+		}
+	}
+
 	res, err := resolver.NewResolver(spec.Provider, resolver.Options{
 		Arch:           spec.Arch,
 		Repositories:   spec.Contents.Repositories,
 		LockedPackages: lockedPkgs,
 		CACerts:        caCerts,
 		Timeout:        timeoutDuration,
+		OSVersion:      osVersion,
 	})
 	if err != nil {
 		return nil, err

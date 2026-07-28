@@ -24,11 +24,10 @@ const (
 	defaultAlpineRepoBase = "https://dl-cdn.alpinelinux.org/alpine"
 )
 
-// defaultRepos returns the standard main + community repositories for Alpine.
+// defaultRepos returns the standard main repository for Alpine.
 func defaultRepos(version, arch string) []string {
 	return []string{
 		fmt.Sprintf("%s/%s/main/%s", defaultAlpineRepoBase, version, arch),
-		fmt.Sprintf("%s/%s/community/%s", defaultAlpineRepoBase, version, arch),
 	}
 }
 
@@ -70,9 +69,17 @@ func newAPKResolver(opts resolver.Options) (resolver.Resolver, error) {
 		arch = "aarch64"
 	}
 
+	version := opts.OSVersion
+	if version == "" {
+		version = defaultAlpineVersion
+	}
+	if !strings.HasPrefix(version, "v") && version != "edge" {
+		version = "v" + version
+	}
+
 	repos := opts.Repositories
 	if len(repos) == 0 {
-		repos = defaultRepos(defaultAlpineVersion, arch)
+		repos = defaultRepos(version, arch)
 	}
 
 	var httpClient *http.Client

@@ -43,6 +43,7 @@ type Options struct {
 	LockedPackages map[string]string // Pin package name -> exact version from doko.lock
 	CACerts        [][]byte          // Custom CA certificates PEM data
 	Timeout        time.Duration     // Custom HTTP client timeout
+	OSVersion      string            // Target OS Version (e.g., "3.23", "12")
 }
 
 // LockedPackage represents a pinned package version from a lockfile.

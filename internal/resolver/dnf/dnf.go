@@ -104,7 +104,12 @@ func newDNFResolver(opts resolver.Options) (resolver.Resolver, error) {
 
 	repos := opts.Repositories
 	if len(repos) == 0 {
-		repos = []string{defaultFedoraRepo}
+		version := opts.OSVersion
+		if version == "" {
+			version = "40"
+		}
+		repo := fmt.Sprintf("https://mirrors.fedoraproject.org/metalink?repo=fedora-%s&arch=%s", version, arch)
+		repos = []string{repo}
 	}
 
 	var httpClient *http.Client

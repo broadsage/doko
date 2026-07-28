@@ -73,7 +73,20 @@ func newAPTResolver(opts resolver.Options) (resolver.Resolver, error) {
 	repos := opts.Repositories
 	mirror := defaultDebianMirror
 	if len(repos) == 0 {
-		repos = defaultRepos(mirror, defaultSuite, defaultComponent, arch)
+		suite := defaultSuite
+		if opts.OSVersion != "" {
+			switch opts.OSVersion {
+			case "12":
+				suite = "bookworm"
+			case "13":
+				suite = "trixie"
+			case "11":
+				suite = "bullseye"
+			default:
+				suite = opts.OSVersion
+			}
+		}
+		repos = defaultRepos(mirror, suite, defaultComponent, arch)
 	}
 
 	var httpClient *http.Client

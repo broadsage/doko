@@ -3,6 +3,7 @@
 name: Nginx stable
 image: ghcr.io/broadsage/doko/nginx
 variant: runtime
+timeout-seconds: 120
 tags:
   - latest
   - "1.26"
