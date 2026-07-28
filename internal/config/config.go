@@ -287,17 +287,14 @@ func (s *Spec) Validate() error {
 			s.Base = "alpine-3.20"
 			s.Provider = "apk"
 		} else {
-			switch id {
-			case "alpine":
-				s.Provider = "apk"
-				s.Base = "alpine-" + version
-			case "debian", "ubuntu":
-				s.Provider = "apt"
-				s.Base = "debian-" + version
-			case "fedora", "centos", "rhel":
-				s.Provider = "dnf"
-				s.Base = "fedora-" + version
-			default:
+			s.Provider = DetectProvider(id)
+			if s.Provider != "" {
+				baseName := id
+				if id == "ubuntu" {
+					baseName = "debian"
+				}
+				s.Base = baseName + "-" + version
+			} else {
 				// Fallback default
 				s.Base = "alpine-3.20"
 				s.Provider = "apk"
@@ -336,4 +333,19 @@ func (s *Spec) Validate() error {
 		return fmt.Errorf("layerkit config validation failed:\n  - %s", strings.Join(errs, "\n  - "))
 	}
 	return nil
+}
+
+// DetectProvider detects the package provider from an OS name or base image reference.
+func DetectProvider(val string) string {
+	valLower := strings.ToLower(val)
+	switch {
+	case strings.Contains(valLower, "alpine") || strings.Contains(valLower, "apk"):
+		return "apk"
+	case strings.Contains(valLower, "debian") || strings.Contains(valLower, "ubuntu") || strings.Contains(valLower, "apt"):
+		return "apt"
+	case strings.Contains(valLower, "fedora") || strings.Contains(valLower, "centos") || strings.Contains(valLower, "rhel") || strings.Contains(valLower, "dnf"):
+		return "dnf"
+	default:
+		return ""
+	}
 }

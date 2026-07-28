@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/broadsage/doko/internal/config"
 	"github.com/broadsage/doko/internal/resolver"
 	"github.com/broadsage/doko/internal/sbom"
 	"github.com/broadsage/doko/internal/vulnerability"
@@ -105,14 +106,8 @@ func (g *Gate) providerName(ecosystem string) string {
 	if len(parts) == 0 {
 		return "apk"
 	}
-	switch strings.ToLower(parts[0]) {
-	case "alpine":
-		return "apk"
-	case "debian", "ubuntu":
-		return "apt"
-	case "fedora", "centos", "rhel":
-		return "dnf"
-	default:
-		return "apk"
+	if prov := config.DetectProvider(parts[0]); prov != "" {
+		return prov
 	}
+	return "apk"
 }

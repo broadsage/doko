@@ -107,14 +107,8 @@ func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b 
 			provider = b.Provider
 		} else {
 			// Auto-detect provider from sub-build base
-			baseLower := strings.ToLower(b.Base)
-			switch {
-			case strings.Contains(baseLower, "alpine"):
-				provider = "apk"
-			case strings.Contains(baseLower, "debian") || strings.Contains(baseLower, "ubuntu"):
-				provider = "apt"
-			case strings.Contains(baseLower, "fedora") || strings.Contains(baseLower, "centos") || strings.Contains(baseLower, "rhel"):
-				provider = "dnf"
+			if p := config.DetectProvider(b.Base); p != "" {
+				provider = p
 			}
 		}
 		stageBaseRef = resolveBaseImageFor(provider, b.Base)
