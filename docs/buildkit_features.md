@@ -46,7 +46,7 @@ The SSH agent socket will be dynamically mounted at `/run/ssh-agent.sock` and th
 Doko does not copy CA certificates (`contents.ca-certificates`) or keyrings (`contents.keyring`) into permanent image layers. 
 
 Instead, they are mounted as **read-only transient mounts** (`llb.Readonly` with `llb.SourcePath`) from independent source states:
-- They are mounted to `/etc/apk/keys/` (or provider equivalent) *only during package management* (`apk/apt/dnf`).
+- They are mounted to `/etc/apk/keys/` *only during package management* (`apk`).
 - Custom CA certificates are mounted *only during package management* and *only during the `update-ca-certificates` run*.
 
 This ensures that:

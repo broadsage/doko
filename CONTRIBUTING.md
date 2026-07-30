@@ -161,7 +161,7 @@ Doko uses **[Conventional Commits](https://www.conventionalcommits.org/)** for a
 ### Examples
 
 ```
-feat(resolver): add dnf provider for Fedora/RHEL packages
+feat(resolver): add secure mirror fallback for APKINDEX downloads
 fix(policy): correctly evaluate medium severity CVEs against threshold
 chore(deps): update github.com/moby/buildkit to v0.32.0
 docs(schema): add work-dir field documentation
@@ -225,8 +225,6 @@ internal/
   provenance/      — SLSA provenance attestation generation
   resolver/        — Package resolver interface and registry
     apk/           — Alpine APKINDEX resolver
-    apt/           — Debian Packages.gz resolver
-    dnf/           — Fedora/RHEL DNF resolver
   sbom/            — CycloneDX and SPDX SBOM generation
   security/        — Seccomp and Landlock profile generators
   sign/            — Cosign image signing integration

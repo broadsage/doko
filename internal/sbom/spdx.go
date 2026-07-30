@@ -174,16 +174,10 @@ func MarshalSPDX(doc *Document) ([]byte, error) {
 // BuildPURL constructs a Package URL (PURL) for the given package.
 // See: https://github.com/package-url/purl-spec
 func BuildPURL(provider string, pkg resolver.Package) string {
-	switch provider {
-	case "apk":
+	if provider == "apk" {
 		return fmt.Sprintf("pkg:apk/alpine/%s@%s?arch=%s", pkg.Name, pkg.Version, pkg.Arch)
-	case "apt":
-		return fmt.Sprintf("pkg:deb/debian/%s@%s?arch=%s", pkg.Name, pkg.Version, pkg.Arch)
-	case "dnf":
-		return fmt.Sprintf("pkg:rpm/fedora/%s@%s?arch=%s", pkg.Name, pkg.Version, pkg.Arch)
-	default:
-		return ""
 	}
+	return ""
 }
 
 // normalizeLicense maps a license string to a valid SPDX identifier.

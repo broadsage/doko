@@ -66,31 +66,6 @@ func TestGenerateSPDX_BasicSBOM(t *testing.T) {
 	}
 }
 
-func TestGenerateSPDX_DebianPURL(t *testing.T) {
-	spec := &config.Spec{
-		Name:     "deb-app",
-		Provider: "apt",
-		Base:     "debian-13",
-	}
-	packages := []resolver.Package{
-		{Name: "libc6", Version: "2.41-6", Arch: "amd64"},
-	}
-
-	doc, err := GenerateSPDX(spec, packages)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	libcPkg := doc.Packages[1]
-	if len(libcPkg.ExternalRefs) != 1 {
-		t.Fatalf("expected 1 external ref, got %d", len(libcPkg.ExternalRefs))
-	}
-	expected := "pkg:deb/debian/libc6@2.41-6?arch=amd64"
-	if libcPkg.ExternalRefs[0].Locator != expected {
-		t.Errorf("expected PURL %q, got %q", expected, libcPkg.ExternalRefs[0].Locator)
-	}
-}
-
 func TestMarshalSPDX_ValidJSON(t *testing.T) {
 	spec := &config.Spec{Name: "json-test", Provider: "apk", Base: "alpine-3.23"}
 	doc, _ := GenerateSPDX(spec, nil)
@@ -116,7 +91,6 @@ func TestBuildPURL(t *testing.T) {
 		expected string
 	}{
 		{"apk", resolver.Package{Name: "curl", Version: "8.12.1-r0", Arch: "x86_64"}, "pkg:apk/alpine/curl@8.12.1-r0?arch=x86_64"},
-		{"apt", resolver.Package{Name: "nginx", Version: "1.27.4-1", Arch: "amd64"}, "pkg:deb/debian/nginx@1.27.4-1?arch=amd64"},
 		{"unknown", resolver.Package{Name: "test"}, ""},
 	}
 

@@ -34,7 +34,7 @@ Traditional Dockerfiles are imperative, error-prone, and difficult to audit. Exi
 
 | Feature | Docker DHI | Chainguard (apko) | **Doko** |
 | :--- | :--- | :--- | :--- |
-| Target OS | Alpine, Debian | Wolfi/Alpine only | **Multi-OS (apk, apt, dnf)** |
+| Target OS | Alpine, Debian | Wolfi/Alpine only | **Alpine only (apk)** |
 | Security Scanning | Post-build | Post-build | **Compile-time gate** |
 | Sandbox Profiles | Manual | Manual | **Auto-generated** |
 | Multi-Stage Builds | Yes | No | **Yes (with `outputs:`)** |
@@ -105,8 +105,8 @@ No Dockerfile. No shell scripts. No post-build scanning.
 **Declarative YAML Syntax**
 Define packages, directories, users, ports, and entrypoint in a single auditable file. Every security decision is visible and reviewable in version control.
 
-**Multi-OS Package Providers**
-Use `apk` for Alpine, `apt` for Debian/Ubuntu, or `dnf` for Fedora/RHEL — unified schema across all distributions.
+**APK Package Provider**
+Use `apk` for Alpine.
 
 **Negative Package Removal**
 Prefix any package with `!` to strip it from the base image:
@@ -183,8 +183,6 @@ internal/
   provenance/       — SLSA provenance attestation generation
   resolver/         — Package resolver interface and registry
     apk/            — Alpine APKINDEX resolver
-    apt/            — Debian Packages.gz resolver
-    dnf/            — Fedora/RHEL DNF resolver
   sbom/             — CycloneDX and SPDX SBOM generation
   security/         — Seccomp and Landlock profile generators
   sign/             — Cosign image signing integration

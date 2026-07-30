@@ -85,7 +85,7 @@ func TestGate_Evaluate_EmptyLicenseInPackage(t *testing.T) {
 	pkgs := []resolver.Package{
 		{Name: "libc6", Version: "2.41", License: ""},
 	}
-	// Empty license in package should pass — Debian packages often lack license in index
+	// Empty license in package should pass — packages often lack license in index
 	if err := g.Evaluate(context.Background(), pkgs, "Alpine:v3.23"); err != nil {
 		t.Errorf("expected no error for empty license in package, got: %v", err)
 	}

@@ -20,7 +20,7 @@ type Package struct {
 }
 
 // Resolver is the interface that all package providers must implement.
-// Implementations live in sub-packages (apk/, apt/).
+// Implementations live in sub-packages (apk/).
 type Resolver interface {
 	// Name returns the human-readable name of the provider (e.g. "Alpine APK").
 	Name() string

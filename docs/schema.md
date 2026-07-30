@@ -160,7 +160,7 @@ os-release:
 | Field | Description |
 |---|---|
 | `name` | Full name of the OS (maps to `NAME=`) |
-| `id` | OS identifier (maps to `ID=`). Should match the actual base (e.g. `alpine`, `debian`). |
+| `id` | OS identifier (maps to `ID=`). Should match the actual base (e.g. `alpine`). |
 | `version-id` | Version string (maps to `VERSION_ID=`) |
 | `version-codename` | Codename, if applicable (maps to `VERSION_CODENAME=`) |
 | `pretty-name` | Human-readable name (maps to `PRETTY_NAME=`) |
@@ -320,7 +320,7 @@ builds:
 |---|---|---|
 | `name` | `string` | Required. Unique identifier for this build stage. Referenced in build logs. |
 | `base` | `string` | Override the base image for this specific stage (e.g. `golang:1.22-alpine`). |
-| `provider` | `string` | Override the package manager for this stage (`apk`, `apt`, `dnf`). Auto-detected from `base` if omitted. |
+| `provider` | `string` | Override the package manager for this stage (`apk`). Auto-detected from `base` if omitted. |
 | `work-dir` | `string` | Sets the working directory context inside the sub-build container for pipeline execution. |
 | `privileged` | `bool` | Runs the sub-build stage pipeline commands in privileged mode (enables `security.insecure` entitlement). |
 | `outputs` | `[]Output` | **Producer-Push model.** Declares which paths this stage exports into the final image. |
@@ -345,7 +345,7 @@ builds:
 
 ### `contents.packages`
 
-Install or remove packages using the configured package manager (`apk`, `apt`, or `dnf`).
+Install or remove packages using the configured package manager (`apk`).
 
 ```yaml
 contents:
@@ -356,7 +356,7 @@ contents:
     - "!gawk"       # Remove gawk from the base image
 ```
 
-**Negative packages (prefix `!`):** Prefixing a package name with `!` removes it from the base image. Doko runs the appropriate package manager removal command (`apk del`, `apt-get purge`, `dnf remove`).
+**Negative packages (prefix `!`):** Prefixing a package name with `!` removes it from the base image. Doko runs the appropriate package manager removal command (`apk del`).
 
 > **Advantage:** Directly reduces the attack surface by stripping unnecessary utilities from the base without requiring a custom base image.
 
