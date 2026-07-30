@@ -12,11 +12,8 @@ func TestSanitizeBaseTag(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"debian-13-minimal", "13"},
-		{"debian-12-slim", "12"},
 		{"alpine-3.23", "3.23"},
 		{"alpine-3.23-base", "3.23"},
-		{"ubuntu-24.04", "ubuntu-24.04"},
 		{"custom-image", "custom-image"},
 	}
 

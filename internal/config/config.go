@@ -182,8 +182,6 @@ type RuntimeConfig struct {
 // supportedProviders is the set of provider names LayerKit currently supports.
 var supportedProviders = map[string]bool{
 	"apk": true,
-	"apt": true,
-	"dnf": true,
 }
 
 // supportedProfiles is the set of security profile types LayerKit can generate.
@@ -316,7 +314,7 @@ func (s *Spec) Validate() error {
 	}
 
 	if !supportedProviders[s.Provider] {
-		errs = append(errs, fmt.Sprintf("unsupported provider %q (supported: apk, apt, dnf)", s.Provider))
+		errs = append(errs, fmt.Sprintf("unsupported provider %q (supported: apk)", s.Provider))
 	}
 
 	// Validate security profiles
@@ -354,10 +352,6 @@ func DetectProvider(val string) string {
 	switch {
 	case strings.Contains(valLower, "alpine") || strings.Contains(valLower, "apk"):
 		return "apk"
-	case strings.Contains(valLower, "debian") || strings.Contains(valLower, "ubuntu") || strings.Contains(valLower, "apt"):
-		return "apt"
-	case strings.Contains(valLower, "fedora") || strings.Contains(valLower, "centos") || strings.Contains(valLower, "rhel") || strings.Contains(valLower, "dnf"):
-		return "dnf"
 	default:
 		return ""
 	}

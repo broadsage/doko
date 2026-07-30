@@ -317,18 +317,14 @@ func (g *Generator) applyRuntime(state buildkitllb.State) buildkitllb.State {
 }
 
 // sanitizeBaseTag extracts a usable tag from the base field.
-// e.g. "debian-13-minimal" -> "13", "alpine-3.23" -> "3.23", "fedora-40" -> "40".
+// e.g. "alpine-3.23" -> "3.23".
 func sanitizeBaseTag(base string) string {
-	for _, prefix := range []string{"debian-", "alpine-", "fedora-"} {
-		if len(base) > len(prefix) && base[:len(prefix)] == prefix {
-			tag := base[len(prefix):]
-			for _, suffix := range []string{"-minimal", "-slim", "-base"} {
-				if len(tag) > len(suffix) && tag[len(tag)-len(suffix):] == suffix {
-					tag = tag[:len(tag)-len(suffix)]
-				}
-			}
-			return tag
+	if remainder, cut := strings.CutPrefix(base, "alpine-"); cut {
+		tag := remainder
+		for _, suffix := range []string{"-minimal", "-slim", "-base"} {
+			tag = strings.TrimSuffix(tag, suffix)
 		}
+		return tag
 	}
 	return base
 }

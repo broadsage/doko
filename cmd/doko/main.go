@@ -22,8 +22,6 @@ import (
 	"github.com/broadsage/doko/internal/policy"
 	"github.com/broadsage/doko/internal/resolver"
 	_ "github.com/broadsage/doko/internal/resolver/apk"
-	_ "github.com/broadsage/doko/internal/resolver/apt"
-	_ "github.com/broadsage/doko/internal/resolver/dnf"
 	"github.com/broadsage/doko/internal/vulnerability"
 
 	"github.com/moby/buildkit/frontend/dockerui"
@@ -210,20 +208,15 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
 
 	osVersion := spec.Base
-	for _, prefix := range []string{"debian-", "alpine-", "fedora-"} {
-		if remainder, cut := strings.CutPrefix(osVersion, prefix); cut {
-			osVersion = remainder
-			for _, suffix := range []string{"-minimal", "-slim", "-base"} {
-				osVersion = strings.TrimSuffix(osVersion, suffix)
-			}
-			// Truncate Alpine point releases (e.g. 3.23.5 -> 3.23)
-			if prefix == "alpine-" {
-				parts := strings.Split(osVersion, ".")
-				if len(parts) > 2 {
-					osVersion = parts[0] + "." + parts[1]
-				}
-			}
-			break
+	if remainder, cut := strings.CutPrefix(osVersion, "alpine-"); cut {
+		osVersion = remainder
+		for _, suffix := range []string{"-minimal", "-slim", "-base"} {
+			osVersion = strings.TrimSuffix(osVersion, suffix)
+		}
+		// Truncate Alpine point releases (e.g. 3.23.5 -> 3.23)
+		parts := strings.Split(osVersion, ".")
+		if len(parts) > 2 {
+			osVersion = parts[0] + "." + parts[1]
 		}
 	}
 
@@ -275,13 +268,8 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	// OSV.dev ecosystem names: use the standard ecosystem identifier only.
 	// The package version already scopes the query to the right release.
 	var ecosystem string
-	switch spec.Provider {
-	case "apk":
+	if spec.Provider == "apk" {
 		ecosystem = "Alpine"
-	case "apt":
-		ecosystem = "Debian"
-	case "dnf":
-		ecosystem = "Fedora"
 	}
 	if err := gate.Evaluate(ctx, resolvedPkgs, ecosystem); err != nil {
 		return nil, fmt.Errorf("[doko] build blocked by security policy: %w", err)
