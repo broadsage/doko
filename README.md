@@ -7,9 +7,9 @@
 [![Build](https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/build.yml)
 [![Verify](https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/verify.yml)
 [![Test Examples](https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/test-examples.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
 [![Go version](https://img.shields.io/github/go-mod/go-version/broadsage/doko)](go.mod)
-[![Latest Release](https://img.shields.io/github/v/release/broadsage/doko)](https://github.com/broadsage/doko/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/broadsage/doko?label=Release)](https://github.com/broadsage/doko/releases/latest)
 
 **Doko** is an open-source [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` spec into a minimal, hardened, policy-compliant OCI container image — all from a single declarative file.
 
