@@ -42,14 +42,6 @@ os-release:
   pretty-name: Broadsage Secured Images/Alpine Linux v3.23
   home-url: https://broadsage.com/products/secured-images/
   bug-report-url: https://broadsage.com/support/
-
-security:
-  policy:
-    fail-on-cve: high
-  profiles:
-    - seccomp
-    - landlock
-
 builds:
   - name: config-builder
     outputs:

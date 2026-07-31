@@ -170,91 +170,6 @@ os-release:
 
 ---
 
-## `security` — Security Policy & Sandbox Profiles
-
-**Purpose:** Define compile-time security gates and auto-generated runtime sandbox profiles. This is the core of Doko's hardening capability.
-
-```yaml
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - MIT
-      - Apache-2.0
-      - BSD-3-Clause
-    custom-rego: |
-      package doko
-      deny[msg] {
-        input.package == "telnet"
-        msg := "telnet is not permitted in hardened images"
-      }
-    vex:
-      format: openvex
-      path: ./security/cve-exceptions.json
-  sbom:
-    formats:
-      - spdx
-      - cyclonedx
-  hardening:
-    remove-package-manager: true
-    lock-shell-accounts: true
-    sysctl:
-      net.ipv4.ip_forward: "0"
-    read-only-rootfs: true
-  profiles:
-    - seccomp
-    - landlock
-```
-
-### `security.policy`
-
-| Field | Type | Description |
-|---|---|---|
-| `fail-on-cve` | `string` | Minimum CVE severity that fails the build. Values: `critical`, `high`, `medium`, `low`, `none`. |
-| `allowed-licenses` | `[]string` | Allowlist of SPDX license identifiers. Build fails if a package uses an unlisted license. |
-| `custom-rego` | `string` | Inline [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) Rego policy for advanced custom rules. |
-| `vex` | `object` | VEX exception list configuration (requires `format` and `path`). |
-
-### `security.sbom`
-
-| Field | Type | Description |
-|---|---|---|
-| `formats` | `[]string` | Target SBOM formats to generate. Supported: `spdx`, `cyclonedx`. |
-
-### `security.hardening`
-
-| Field | Type | Description |
-|---|---|---|
-| `remove-package-manager` | `bool` | Purge package manager binaries in final stage. |
-| `lock-shell-accounts` | `bool` | Set default shell to `/sbin/nologin` for non-root users. |
-| `sysctl` | `map[string]string` | Key-value list of sysctl kernel parameters to configure. |
-| `read-only-rootfs` | `bool` | Restrict dynamic write permissions via Landlock. |
-
-**`fail-on-cve` Severity Levels:**
-
-| Level | Description |
-|---|---|
-| `critical` | Only fail on CVSS >= 9.0 |
-| `high` | Fail on CVSS >= 7.0 (recommended for production) |
-| `medium` | Fail on CVSS >= 4.0 |
-| `low` | Fail on any known CVE |
-| `none` | Never fail on CVEs (not recommended) |
-
-### `security.profiles`
-
-Declares which runtime sandbox profiles to auto-generate and embed into the image as OCI annotations:
-
-| Profile | Description |
-|---|---|
-| `seccomp` | Generates a minimal `seccomp` JSON profile allowing only the syscalls required by declared packages. |
-| `landlock` | Generates a `landlock` policy restricting filesystem access to only declared paths. |
-
-### `security.privileged`
-
-Declares whether the final target container requires privileged execution mode at runtime.
-
-When set to `true`, Doko attaches the OCI annotation `com.broadsage.bsi.privileged: "true"` to the OCI manifest metadata. Container runtimes and orchestrators (like Kubernetes Security Policies) can read this metadata to authorize and execute the container with elevated host privileges.
-
 ---
 
 ## `accounts` — Users & Groups
@@ -672,18 +587,6 @@ os-release:
   pretty-name: "Your Org Secured Images / Alpine Linux v3.20"
   home-url: https://your-org.com/products/secured-images/
   bug-report-url: https://your-org.com/support/
-
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - MIT
-      - Apache-2.0
-      - BSD-2-Clause
-  profiles:
-    - seccomp
-    - landlock
-  privileged: false
 
 accounts:
   root: false

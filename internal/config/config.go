@@ -23,7 +23,6 @@ type Spec struct {
 	Provider       string            `yaml:"-"         json:"provider,omitempty"`
 	Base           string            `yaml:"-"         json:"base,omitempty"`
 	Arch           string            `yaml:"arch"      json:"arch,omitempty"` // amd64, arm64 — defaults to amd64
-	Security       SecurityConfig    `yaml:"security"  json:"security"`
 	Contents       ContentsConfig    `yaml:"contents"  json:"contents"`
 	Builds         []BuildSpec       `yaml:"builds"    json:"builds,omitempty"`
 	Runtime        RuntimeConfig     `yaml:"runtime"   json:"runtime"`
@@ -94,41 +93,7 @@ type BuildSpec struct {
 	Pipeline     []PipelineStep `yaml:"pipeline,omitempty"    json:"pipeline,omitempty"`
 }
 
-// HardeningConfig defines declarative OS hardening settings.
-type HardeningConfig struct {
-	RemovePackageManager bool              `yaml:"remove-package-manager" json:"remove-package-manager,omitempty"`
-	LockShellAccounts    bool              `yaml:"lock-shell-accounts"    json:"lock-shell-accounts,omitempty"`
-	Sysctl               map[string]string `yaml:"sysctl"                 json:"sysctl,omitempty"`
-	ReadOnlyRootFS       bool              `yaml:"read-only-rootfs"       json:"read-only-rootfs,omitempty"`
-}
 
-// SBOMConfig defines which SBOM metadata formats should be generated.
-type SBOMConfig struct {
-	Formats []string `yaml:"formats" json:"formats,omitempty"`
-}
-
-// SecurityConfig defines policies and run-time sandbox profile requests.
-type SecurityConfig struct {
-	Policy     PolicyConfig    `yaml:"policy"     json:"policy"`
-	Profiles   []string        `yaml:"profiles"   json:"profiles,omitempty"`
-	Privileged bool            `yaml:"privileged" json:"privileged,omitempty"`
-	Hardening  HardeningConfig `yaml:"hardening"  json:"hardening,omitempty"`
-	SBOM       SBOMConfig      `yaml:"sbom"       json:"sbom,omitempty"`
-}
-
-// VEXConfig holds vulnerability exception list configuration.
-type VEXConfig struct {
-	Format string `yaml:"format" json:"format,omitempty"`
-	Path   string `yaml:"path"   json:"path,omitempty"`
-}
-
-// PolicyConfig holds the rules evaluated at build-time.
-type PolicyConfig struct {
-	FailOnCVE       string    `yaml:"fail-on-cve"       json:"fail-on-cve,omitempty"`
-	AllowedLicenses []string  `yaml:"allowed-licenses"  json:"allowed-licenses,omitempty"`
-	CustomRego      string    `yaml:"custom-rego"       json:"custom-rego,omitempty"`
-	VEX             VEXConfig `yaml:"vex"               json:"vex,omitempty"`
-}
 
 // PipelineSecret represents a BuildKit secret mount option.
 type PipelineSecret struct {
@@ -195,20 +160,7 @@ var supportedProviders = map[string]bool{
 	"apk": true,
 }
 
-// supportedProfiles is the set of security profile types LayerKit can generate.
-var supportedProfiles = map[string]bool{
-	"seccomp":  true,
-	"landlock": true,
-}
 
-// supportedCVELevels is the ordered set of allowed fail-on-cve values.
-var supportedCVELevels = map[string]bool{
-	"critical": true,
-	"high":     true,
-	"medium":   true,
-	"low":      true,
-	"none":     true,
-}
 
 // Interpolate performs string substitution on the raw yaml content using the vars map.
 func Interpolate(data []byte) ([]byte, error) {
@@ -328,21 +280,7 @@ func (s *Spec) Validate() error {
 		errs = append(errs, fmt.Sprintf("unsupported provider %q (supported: apk)", s.Provider))
 	}
 
-	// Validate security profiles
-	for _, p := range s.Security.Profiles {
-		if !supportedProfiles[p] {
-			errs = append(errs, fmt.Sprintf("unsupported security profile %q (supported: seccomp, landlock)", p))
-		}
-	}
 
-	// Validate fail-on-cve level
-	if s.Security.Policy.FailOnCVE != "" {
-		level := strings.ToLower(s.Security.Policy.FailOnCVE)
-		if !supportedCVELevels[level] {
-			errs = append(errs, fmt.Sprintf("unsupported fail-on-cve level %q (supported: critical, high, medium, low, none)", s.Security.Policy.FailOnCVE))
-		}
-		s.Security.Policy.FailOnCVE = level
-	}
 
 	// Validate sub-build providers
 	for i, b := range s.Builds {

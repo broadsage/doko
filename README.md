@@ -11,7 +11,7 @@
 [![Go version](https://img.shields.io/github/go-mod/go-version/broadsage/doko)](go.mod)
 [![Latest Release](https://img.shields.io/github/v/release/broadsage/doko)](https://github.com/broadsage/doko/releases/latest)
 
-**Doko** is an open-source [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` spec into a minimal, hardened, policy-compliant OCI container image. It evaluates CVE databases and license policies **at build time**, auto-generates Seccomp and Landlock sandbox profiles, and produces signed SBOMs and SLSA provenance — all from a single declarative file.
+**Doko** is an open-source [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` spec into a minimal, hardened, policy-compliant OCI container image — all from a single declarative file.
 
 ---
 
@@ -34,9 +34,7 @@ Traditional Dockerfiles are imperative, error-prone, and difficult to audit. Exi
 
 | Feature | Docker DHI | Chainguard (apko) | **Doko** |
 | :--- | :--- | :--- | :--- |
-| Target OS | Alpine, Debian | Wolfi/Alpine only | **Alpine only (apk)** |
-| Security Scanning | Post-build | Post-build | **Compile-time gate** |
-| Sandbox Profiles | Manual | Manual | **Auto-generated** |
+| Target OS | Alpine, Debian | Wolfi/Alpine only | **Alpine** |
 | Multi-Stage Builds | Yes | No | **Yes (with `outputs:`)** |
 | Negative Packages | Yes (`!pkg`) | No | **Yes (`!pkg`)** |
 | Open Source | Partial | Yes | **100% Open Source** |
@@ -51,12 +49,6 @@ Traditional Dockerfiles are imperative, error-prone, and difficult to audit. Exi
 # syntax=ghcr.io/broadsage/doko:v1
 
 name: secure-web-app
-
-security:
-  policy:
-    fail-on-cve: high
-  profiles:
-    - seccomp
 
 accounts:
   root: false
@@ -159,17 +151,11 @@ artifacts:
       - /usr/local/bin/gosu
 ```
 
-**Compile-Time Security Gates**
-CVE databases and license policies are evaluated **during the build**. If a package violates policy, the build fails before an image is ever created.
-
-**Auto-Generated Sandbox Profiles**
-Doko synthesizes custom **Seccomp** and **Landlock** profiles based on the exact packages and paths declared, embedded as OCI annotations for enforcement by Docker or Kubernetes.
-
 **Root Purging**
 `accounts.root: false` (the default) removes root entirely from `/etc/passwd` and `/etc/group`, eliminating UID 0 privilege escalation.
 
-**OCI-Native Supply Chain**
-All annotations follow the [OCI Image Spec](https://github.com/opencontainers/image-spec/blob/main/annotations.md). Images are signed with Cosign and include CycloneDX/SPDX SBOMs and SLSA provenance attestations.
+**OCI-Native Layout**
+All annotations follow the [OCI Image Spec](https://github.com/opencontainers/image-spec/blob/main/annotations.md).
 
 ---
 
@@ -196,14 +182,9 @@ internal/
   llb/              — BuildKit LLB translation engine
   netutil/          — Shared HTTP client utilities
   pipeline/         — Reusable pipeline template engine (vars, steps)
-  policy/           — Compile-time CVE and license policy gates
-  provenance/       — SLSA provenance attestation generation
   providers/        — Unified provider registry (resolvers + builders)
     apk/            — Alpine APKINDEX resolver and LLB builder
       builder/      — APK package compilation engine and pipeline templates
-  sbom/             — CycloneDX and SPDX SBOM generation
-  security/         — Seccomp and Landlock profile generators
-  vulnerability/    — OSV.dev CVE scanner and VEX matcher
 ```
 
 ---

@@ -9,15 +9,6 @@ func TestParse_ValidConfig(t *testing.T) {
 	yamlInput := `
 name: test-app
 
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - MIT
-      - Apache-2.0
-  profiles:
-    - seccomp
-
 contents:
   packages:
     - curl
@@ -49,9 +40,6 @@ runtime:
 	if spec.Arch != "" {
 		t.Errorf("expected default arch '', got %q", spec.Arch)
 	}
-	if spec.Security.Policy.FailOnCVE != "high" {
-		t.Errorf("expected fail-on-cve 'high', got %q", spec.Security.Policy.FailOnCVE)
-	}
 	if len(spec.Contents.Packages) != 2 {
 		t.Errorf("expected 2 packages, got %d", len(spec.Contents.Packages))
 	}
@@ -62,9 +50,9 @@ runtime:
 
 func TestParse_MissingRequiredFields(t *testing.T) {
 	yamlInput := `
-security:
-  profiles:
-    - seccomp
+contents:
+  packages:
+    - curl
 `
 	_, err := Parse(strings.NewReader(yamlInput))
 	if err == nil {
@@ -72,22 +60,6 @@ security:
 	}
 	if !strings.Contains(err.Error(), "name is required") {
 		t.Errorf("expected 'name is required' in error, got: %v", err)
-	}
-}
-
-func TestParse_UnsupportedCVELevel(t *testing.T) {
-	yamlInput := `
-name: test
-security:
-  policy:
-    fail-on-cve: extreme
-`
-	_, err := Parse(strings.NewReader(yamlInput))
-	if err == nil {
-		t.Fatal("expected validation error for unsupported CVE level, got nil")
-	}
-	if !strings.Contains(err.Error(), "unsupported fail-on-cve level") {
-		t.Errorf("expected 'unsupported fail-on-cve level' in error, got: %v", err)
 	}
 }
 
@@ -120,8 +92,6 @@ runtime:
 func TestParse_PrivilegedConfig(t *testing.T) {
 	yamlInput := `
 name: test-privileged
-security:
-  privileged: true
 builds:
   - name: test-builder
     privileged: true
@@ -134,9 +104,6 @@ builds:
 		t.Fatalf("unexpected error parsing yaml: %v", err)
 	}
 
-	if !spec.Security.Privileged {
-		t.Errorf("expected Security.Privileged to be true")
-	}
 	if len(spec.Builds) != 1 || !spec.Builds[0].Privileged {
 		t.Errorf("expected Builds[0].Privileged to be true")
 	}

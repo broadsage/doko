@@ -27,17 +27,6 @@ annotations:
   org.opencontainers.image.source: "https://github.com/broadsage/doko"
   org.opencontainers.image.version: "${PYTHON_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
-
-security:
-  policy:
-    fail-on-cve: medium
-    allowed-licenses:
-      - MIT
-      - Apache-2.0
-      - BSD-3-Clause
-  profiles:
-    - seccomp
-
 builds:
   - name: dependency-builder
     outputs:

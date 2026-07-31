@@ -23,24 +23,6 @@ annotations:
   org.opencontainers.image.description: "Hardened PostgreSQL server built with Doko"
   org.opencontainers.image.version: "${PG_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
-
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - PostgreSQL
-      - MIT
-      - BSD-3-Clause
-      - Apache-2.0
-      - Public-Domain
-      - GPL-2.0-or-later
-      - GPL-3.0-or-later
-      - LGPL-2.1-or-later
-      - OpenSSL
-  profiles:
-    - seccomp
-    - landlock
-
 accounts:
   root: false
   run-as: postgres

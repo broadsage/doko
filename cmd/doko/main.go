@@ -19,10 +19,8 @@ import (
 	"github.com/broadsage/doko/internal/config"
 	layerkitllb "github.com/broadsage/doko/internal/llb"
 	"github.com/broadsage/doko/internal/metadata"
-	"github.com/broadsage/doko/internal/policy"
 	"github.com/broadsage/doko/internal/providers"
 	_ "github.com/broadsage/doko/internal/providers/apk"
-	"github.com/broadsage/doko/internal/vulnerability"
 
 	"github.com/moby/buildkit/frontend/dockerui"
 	"github.com/moby/buildkit/frontend/gateway/client"
@@ -73,15 +71,6 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 			}
 			spec.Vars[argKey] = v
 		}
-	}
-
-	var vexData []byte
-	if spec.Security.Policy.VEX.Path != "" {
-		srcVex, err := bc.ReadEntrypoint(ctx, spec.Security.Policy.VEX.Path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read VEX exceptions file %s: %w", spec.Security.Policy.VEX.Path, err)
-		}
-		vexData = srcVex.Data
 	}
 
 	var lockData []byte
@@ -143,7 +132,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 		parts := strings.Split(platforms[0], "/")
 		arch := parts[len(parts)-1]
 		spec.Arch = arch
-		return buildPlatformResult(ctx, c, spec, vexData, lockedPkgs, caCerts)
+		return buildPlatformResult(ctx, c, spec, lockedPkgs, caCerts)
 	}
 
 	// Multi-platform manifest generation
@@ -183,7 +172,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 		platformSpec := *spec
 		platformSpec.Arch = archVal
 
-		subRes, err := buildPlatformResult(ctx, c, &platformSpec, vexData, lockedPkgs, caCerts)
+		subRes, err := buildPlatformResult(ctx, c, &platformSpec, lockedPkgs, caCerts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build platform %s: %w", p, err)
 		}
@@ -203,7 +192,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 }
 
 // buildPlatformResult compiles and solves the image filesystem and metadata for a given target architecture.
-func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, vexData []byte, lockedPkgs map[string]string, caCerts [][]byte) (*client.Result, error) {
+func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, lockedPkgs map[string]string, caCerts [][]byte) (*client.Result, error) {
 	// 1. Construct a resolver for the specified package provider.
 	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
 
@@ -247,35 +236,6 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	}
 	fmt.Fprintf(os.Stderr, "[doko] resolved %d packages via %s\n", len(resolvedPkgs), res.Name())
 
-	// 3. Evaluate security policies including real OSV.dev CVE scanning (compile-time gate).
-	gate := policy.NewGate(spec.Security.Policy.FailOnCVE, spec.Security.Policy.AllowedLicenses)
-	gate = gate.WithScanner(vulnerability.NewScannerWithTimeout(timeoutDuration))
-	if len(vexData) > 0 {
-		var matcher *vulnerability.VEXMatcher
-		var err error
-		switch strings.ToLower(spec.Security.Policy.VEX.Format) {
-		case "cyclonedx-vex":
-			matcher, err = vulnerability.ParseCycloneDXVEX(vexData)
-		default: // default to openvex
-			matcher, err = vulnerability.ParseOpenVEX(vexData)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse VEX exception list: %w", err)
-		}
-		gate = gate.WithVEXMatcher(matcher)
-	}
-
-	// OSV.dev ecosystem names: use the standard ecosystem identifier only.
-	// The package version already scopes the query to the right release.
-	var ecosystem string
-	if spec.Provider == "apk" {
-		ecosystem = "Alpine"
-	}
-	if err := gate.Evaluate(ctx, resolvedPkgs, ecosystem); err != nil {
-		return nil, fmt.Errorf("[doko] build blocked by security policy: %w", err)
-	}
-	fmt.Fprintf(os.Stderr, "[doko] security policy evaluation passed\n")
-
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
 	gen := layerkitllb.NewGenerator(spec, c)
@@ -297,7 +257,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 6. Generate and attach metadata, SBOMs, SLSA provenance, sandbox profiles, and OCI image configs.
 	fmt.Fprintf(os.Stderr, "[doko] step 6: attaching metadata and configurations\n")
-	if err := metadata.AttachAll(ctx, spec, resolvedPkgs, result); err != nil {
+	if err := metadata.AttachAll(ctx, spec, result); err != nil {
 		return nil, err
 	}
 	fmt.Fprintf(os.Stderr, "[doko] step 6 finished\n")

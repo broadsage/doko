@@ -134,9 +134,6 @@ func TestGenerate_WithPrivileged(t *testing.T) {
 		Name:     "privileged-app",
 		Provider: "apk",
 		Base:     "alpine-3.23",
-		Security: config.SecurityConfig{
-			Privileged: true,
-		},
 		Builds: []config.BuildSpec{
 			{
 				Name:       "builder",

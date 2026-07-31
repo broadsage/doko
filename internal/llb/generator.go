@@ -97,9 +97,6 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 	// 4. Create directories (individual layer per directory)
 	state = g.setupDirectories(state)
 
-	// 5. Security hardening (individual layer)
-	state = g.applyHardening(state)
-
 	// 6. Run pipeline steps if any (already individual layers per step).
 	state = g.runPipeline(state)
 
@@ -498,41 +495,7 @@ func (g *Generator) setupDirectories(state buildkitllb.State) buildkitllb.State 
 	return state
 }
 
-// applyHardening removes the package manager (using native BuildKit Rm) and locks shell accounts as individual layers.
-func (g *Generator) applyHardening(state buildkitllb.State) buildkitllb.State {
-	hcfg := g.Spec.Security.Hardening
 
-	// 1. Remove Package Manager natively
-	if hcfg.RemovePackageManager {
-		p, err := providers.GetBuilder(g.Spec.Provider)
-		if err == nil {
-			paths := p.RemovePaths()
-			if len(paths) > 0 {
-				var fileAction *buildkitllb.FileAction
-				for _, path := range paths {
-					if fileAction == nil {
-						fileAction = buildkitllb.Rm(path, buildkitllb.WithAllowNotFound(true), buildkitllb.WithAllowWildcard(true))
-					} else {
-						fileAction = fileAction.Rm(path, buildkitllb.WithAllowNotFound(true), buildkitllb.WithAllowWildcard(true))
-					}
-				}
-				if fileAction != nil {
-					state = state.File(fileAction, buildkitllb.WithCustomName("remove package manager files"))
-				}
-			}
-		}
-	}
-
-	// 2. Lock shell accounts (requires sed shell execution)
-	if hcfg.LockShellAccounts {
-		state = state.Run(
-			buildkitllb.Args([]string{"/bin/sh", "-c", "sed -i -E '/^root:/! s|:(/bin/[a-z]*sh)$|:/sbin/nologin|g' /etc/passwd || true"}),
-			buildkitllb.WithCustomName("lock shell accounts"),
-		).Root()
-	}
-
-	return state
-}
 
 // copyLocalFiles copies each local file path as an individual layer.
 func (g *Generator) copyLocalFiles(state buildkitllb.State) buildkitllb.State {
@@ -667,19 +630,7 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 		fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
 	}
 
-	// 2. Write sysctl config
-	sysctl := g.Spec.Security.Hardening.Sysctl
-	if len(sysctl) > 0 {
-		var sb strings.Builder
-		for k, v := range sysctl {
-			fmt.Fprintf(&sb, "%s = %s\n", k, v)
-		}
-		if fileAction == nil {
-			fileAction = buildkitllb.Mkfile("/etc/sysctl.d/99-doko.conf", 0o644, []byte(sb.String()))
-		} else {
-			fileAction = fileAction.Mkfile("/etc/sysctl.d/99-doko.conf", 0o644, []byte(sb.String()))
-		}
-	}
+
 
 	if fileAction != nil {
 		state = state.File(fileAction, buildkitllb.WithCustomName("add metadata"))

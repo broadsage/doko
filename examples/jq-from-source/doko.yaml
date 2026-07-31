@@ -34,18 +34,6 @@ annotations:
   org.opencontainers.image.description: "jq compiled from source using Doko pipeline templates"
   org.opencontainers.image.version: "${JQ_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
-
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - MIT
-      - ISC
-      - BSD-2-Clause
-      - BSD-3-Clause
-  profiles:
-    - seccomp
-
 # Custom package compilation using pipeline templates.
 # jq is compiled from source in an isolated BuildKit stage.
 # Only the resulting .apk is injected into the final image.

@@ -22,18 +22,6 @@ annotations:
   org.opencontainers.image.description: "Hardened Redis server built with Doko"
   org.opencontainers.image.version: "${REDIS_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
-
-security:
-  policy:
-    fail-on-cve: high
-    allowed-licenses:
-      - BSD-3-Clause
-      - MIT
-      - Apache-2.0
-  profiles:
-    - seccomp
-    - landlock
-
 accounts:
   root: false
   run-as: redis
