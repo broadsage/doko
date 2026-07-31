@@ -4,7 +4,7 @@ import (
 	"archive/tar"
 	"bufio"
 	"compress/gzip"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // APK format requires SHA-1 checksums per spec
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -21,22 +21,28 @@ import (
 
 type writerCounter struct {
 	writer io.Writer
-	count  uint64
+	count  atomic.Uint64
 }
 
 func (c *writerCounter) Write(p []byte) (n int, err error) {
 	n, err = c.writer.Write(p)
-	atomic.AddUint64(&c.count, uint64(n))
-	return n, err
+	if err != nil {
+		return n, fmt.Errorf("counter write: %w", err)
+	}
+	c.count.Add(uint64(n))
+	return n, nil
 }
 
-func (c *writerCounter) countVal() uint64 { return atomic.LoadUint64(&c.count) }
+func (c *writerCounter) countVal() uint64 { return c.count.Load() }
 
 func writeTarDir(tw *tar.Writer, h *tar.Header) error {
 	h.ChangeTime = time.Time{}
 	h.AccessTime = time.Time{}
 	h.Format = tar.FormatPAX
-	return tw.WriteHeader(h)
+	if err := tw.WriteHeader(h); err != nil {
+		return fmt.Errorf("write tar dir header: %w", err)
+	}
+	return nil
 }
 
 func writeTarFile(tw *tar.Writer, h *tar.Header, r io.Reader) error {
@@ -44,10 +50,12 @@ func writeTarFile(tw *tar.Writer, h *tar.Header, r io.Reader) error {
 	h.ChangeTime = time.Time{}
 	h.AccessTime = time.Time{}
 	if err := tw.WriteHeader(h); err != nil {
-		return err
+		return fmt.Errorf("write tar file header: %w", err)
 	}
-	_, err := io.Copy(tw, r)
-	return err
+	if _, err := io.Copy(tw, r); err != nil {
+		return fmt.Errorf("write tar file content: %w", err)
+	}
+	return nil
 }
 
 type tarKind int
@@ -85,7 +93,7 @@ func writeTgz(w io.Writer, kind tarKind, build func(tw *tar.Writer) error, diges
 	}
 
 	if err := gz.Close(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("close gzip writer: %w", err)
 	}
 	return digest.Sum(nil), nil
 }
@@ -117,7 +125,7 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 	dataDigest := sha256.New()
 	dataTgz, err := os.CreateTemp("", "apk-data-*.tgz")
 	if err != nil {
-		return err
+		return fmt.Errorf("create data temp file: %w", err)
 	}
 	defer os.Remove(dataTgz.Name())
 	defer dataTgz.Close()
@@ -129,7 +137,7 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 			}
 			rel, err := filepath.Rel(dataDir, path)
 			if err != nil {
-				return err
+				return fmt.Errorf("compute relative path: %w", err)
 			}
 			// APK expects forward slashes and no leading ./
 			name := filepath.ToSlash(rel)
@@ -138,7 +146,7 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 			}
 			h, err := tar.FileInfoHeader(info, name)
 			if err != nil {
-				return err
+				return fmt.Errorf("build tar header: %w", err)
 			}
 			h.Name = name
 
@@ -146,15 +154,15 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 				return writeTarDir(tw, h)
 			}
 
-			f, err := os.Open(path)
+			f, err := os.Open(path) //nolint:gosec // Walk callback path is trusted (local dataDir)
 			if err != nil {
-				return err
+				return fmt.Errorf("open file %s: %w", path, err)
 			}
 			defer f.Close()
 
-			h1 := sha1.New()
+			h1 := sha1.New() //nolint:gosec // APK-TOOLS.checksum.SHA1 mandates SHA-1
 			if _, err := io.Copy(h1, f); err != nil {
-				return err
+				return fmt.Errorf("compute sha1 checksum: %w", err)
 			}
 			sha1Hex := hex.EncodeToString(h1.Sum(nil))
 			h.PAXRecords = map[string]string{
@@ -163,7 +171,7 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 
 			// Seek back to start to write content to tarball
 			if _, err := f.Seek(0, io.SeekStart); err != nil {
-				return err
+				return fmt.Errorf("seek file: %w", err)
 			}
 
 			dataSize += info.Size()
@@ -200,7 +208,7 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 
 	controlTgz, err := os.CreateTemp("", "apk-control-*.tgz")
 	if err != nil {
-		return err
+		return fmt.Errorf("create control temp file: %w", err)
 	}
 	defer os.Remove(controlTgz.Name())
 	defer controlTgz.Close()
@@ -212,24 +220,24 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 			Size: int64(len(pkginfoBytes)),
 		}
 		return writeTarFile(tw, h, strings.NewReader(pkginfoBytes))
-	}, sha1.New())
+	}, sha1.New()) //nolint:gosec // APK control archive uses SHA-1 digest
 	if err != nil {
 		return fmt.Errorf("control tgz: %w", err)
 	}
 
 	out, err := os.Create(outPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("create output APK: %w", err)
 	}
 	defer out.Close()
 
 	// APK = control + data (no signature)
 	for _, f := range []*os.File{controlTgz, dataTgz} {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
-			return err
+			return fmt.Errorf("seek for copy: %w", err)
 		}
 		if _, err := io.Copy(out, f); err != nil {
-			return err
+			return fmt.Errorf("write APK segment: %w", err)
 		}
 	}
 	return nil

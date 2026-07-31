@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/broadsage/doko/internal/builder"
 	"github.com/moby/buildkit/frontend/gateway/grpcclient"
 	"github.com/moby/buildkit/util/appcontext"
+
+	"github.com/broadsage/doko/internal/builder"
 )
 
 func main() {

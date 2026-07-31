@@ -115,8 +115,6 @@ func setImageConfig(spec *config.Spec, result *client.Result) error {
 		annotations["com.broadsage.bsi.date.end-of-life"] = eol
 	}
 
-
-
 	arch := spec.Arch
 	if arch == "" {
 		arch = "amd64"

@@ -20,8 +20,6 @@ import (
 //go:embed pipelines/*.yaml pipelines/*/*.yaml
 var pipelinesFS embed.FS
 
-const alpineImage = "alpine:3.23"
-
 func init() {
 	pipeline.RegisterTemplateResolver(func(name string) ([]byte, error) {
 		return pipelinesFS.ReadFile("pipelines/" + name + ".yaml")
@@ -46,7 +44,7 @@ func collectPipelinePackages(s *config.BuildSpec) ([]string, error) {
 		}
 		def, err := pipeline.GetPipeline(step.Uses)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get pipeline %q: %w", step.Uses, err)
 		}
 		for _, pkg := range def.Needs.Packages {
 			seen[pkg] = struct{}{}
@@ -83,7 +81,7 @@ func buildInstallCommand(s *config.BuildSpec) (string, error) {
 	var b strings.Builder
 	b.WriteString("set -e\n")
 	for _, repo := range s.Contents.Repositories {
-		b.WriteString(fmt.Sprintf("echo %q >> /etc/apk/repositories\n", repo))
+		fmt.Fprintf(&b, "echo %q >> /etc/apk/repositories\n", repo)
 	}
 	if len(all) > 0 {
 		b.WriteString("apk add --no-cache ")
@@ -135,10 +133,10 @@ func sortedInputNames(def *pipeline.PipelineDef) string {
 }
 
 // resolveInputs returns the full substitution map (package/targets/context + inputs) with recursive substitution applied.
-func resolveInputs(def *pipeline.PipelineDef, with map[string]interface{}, s *config.BuildSpec) (map[string]string, error) {
+func resolveInputs(def *pipeline.PipelineDef, with map[string]any, s *config.BuildSpec) (map[string]string, error) {
 	sm, err := pipeline.NewSubstitutionMap(s)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create substitution map: %w", err)
 	}
 	withMap := make(map[string]string)
 	for k, v := range def.Inputs {
@@ -158,7 +156,11 @@ func resolveInputs(def *pipeline.PipelineDef, with map[string]interface{}, s *co
 		}
 		withMap[k] = pipeline.Substitute(val, sm.Substitutions)
 	}
-	return sm.MutateWith(withMap)
+	resolved, err := sm.MutateWith(withMap)
+	if err != nil {
+		return nil, fmt.Errorf("apply input substitutions: %w", err)
+	}
+	return resolved, nil
 }
 
 // reInputPlaceholder matches any ${{inputs.xxx}} left after known substitution (avoids bad shell substitution).
@@ -194,7 +196,7 @@ func ResolvePipelineSteps(s *config.BuildSpec) ([]ResolvedStep, error) {
 			}
 			sm, err := pipeline.NewSubstitutionMap(s)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("create substitution map for step %d: %w", i+1, err)
 			}
 			resolved := substituteScript(step.Runs, sm.Substitutions)
 			steps = append(steps, ResolvedStep{
@@ -282,7 +284,7 @@ func BuildAPK(ctx context.Context, s *config.BuildSpec, sourceState llb.State, w
 
 	// Initialize /pkg directory once in the worker state
 	state := workerWithSrc.File(
-		llb.Mkdir("/pkg", 0755, llb.WithParents(true)),
+		llb.Mkdir("/pkg", 0o755, llb.WithParents(true)),
 		opts...,
 	)
 

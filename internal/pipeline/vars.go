@@ -77,7 +77,7 @@ func (sm *SubstitutionMap) MutateWith(with map[string]string) (map[string]string
 		}
 	}
 	// Recursive substitution until fixed point (melange MutateStringFromMap behavior).
-	for i := 0; i < 32; i++ {
+	for range 32 {
 		changed := false
 		for k, v := range nw {
 			replaced := utils.Substitute(v, nw)

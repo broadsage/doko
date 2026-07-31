@@ -183,7 +183,7 @@ func (g *Generator) installPackages(base buildkitllb.State) (buildkitllb.State, 
 func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.State, contents config.ContentsConfig, providerName string) (buildkitllb.State, error) {
 	p, err := providers.GetBuilder(providerName)
 	if err != nil {
-		return base, err
+		return base, fmt.Errorf("get package builder for %s: %w", providerName, err)
 	}
 
 	var installs []string
@@ -209,10 +209,10 @@ func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.Stat
 	}
 
 	if len(localApkPackages) > 0 {
-		base = base.File(buildkitllb.Mkdir("/tmp/packages", 0755, buildkitllb.WithParents(true)))
+		base = base.File(buildkitllb.Mkdir("/tmp/packages", 0o755, buildkitllb.WithParents(true)))
 		for _, lapk := range localApkPackages {
 			destPath := "/tmp/packages/" + lapk.filename
-			base = base.File(buildkitllb.Mkfile(destPath, 0644, lapk.bytes))
+			base = base.File(buildkitllb.Mkfile(destPath, 0o644, lapk.bytes))
 		}
 	}
 
@@ -468,7 +468,7 @@ func (g *Generator) setupAccounts(state buildkitllb.State) buildkitllb.State {
 func (g *Generator) setupDirectories(state buildkitllb.State) buildkitllb.State {
 	for _, p := range g.Spec.Contents.Paths {
 		if p.Type == "directory" || p.Type == "dir" {
-			var mode os.FileMode = 0755
+			var mode os.FileMode = 0o755
 			if p.Mode != "" {
 				var parsed uint32
 				if _, err := fmt.Sscanf(p.Mode, "%o", &parsed); err == nil && parsed != 0 {
@@ -489,8 +489,6 @@ func (g *Generator) setupDirectories(state buildkitllb.State) buildkitllb.State 
 	}
 	return state
 }
-
-
 
 // copyLocalFiles copies each local file path as an individual layer.
 func (g *Generator) copyLocalFiles(state buildkitllb.State) buildkitllb.State {
@@ -624,8 +622,6 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 
 		fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
 	}
-
-
 
 	if fileAction != nil {
 		state = state.File(fileAction, buildkitllb.WithCustomName("add metadata"))

@@ -16,7 +16,7 @@ func Substitute(s string, vars map[string]string) string {
 // SubstituteRecursive recursively replaces variables until a fixed point is reached or maxIterations is hit.
 func SubstituteRecursive(s string, vars map[string]string, maxIterations int) string {
 	out := s
-	for i := 0; i < maxIterations; i++ {
+	for range maxIterations {
 		changed := false
 		for k, v := range vars {
 			replaced := Substitute(v, vars)

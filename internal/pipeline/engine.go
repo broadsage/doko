@@ -27,7 +27,7 @@ func (i *InputDef) UnmarshalYAML(value *yaml.Node) error {
 		Required    bool   `yaml:"required"`
 	}
 	if err := value.Decode(&m); err != nil {
-		return err
+		return fmt.Errorf("decode pipeline input: %w", err)
 	}
 	i.Description = m.Description
 	i.Default = m.Default

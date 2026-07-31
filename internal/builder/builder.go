@@ -189,7 +189,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		Client:         c,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create %s resolver: %w", spec.Provider, err)
 	}
 
 	// 2. Resolve packages using real index lookups.
@@ -212,7 +212,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	gen := layerkitllb.NewGenerator(spec, c)
 	def, err := gen.Generate(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("generate LLB definition: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "[doko] step 4: LLB definition generated successfully\n")
 
@@ -229,7 +229,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	// 6. Generate and attach metadata and OCI image configs.
 	fmt.Fprintf(os.Stderr, "[doko] step 6: attaching metadata and configurations\n")
 	if err := metadata.AttachAll(ctx, spec, result); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("attach metadata: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "[doko] step 6 finished\n")
 	fmt.Fprintf(os.Stderr, "[doko] buildPlatformResult successfully returning result\n")

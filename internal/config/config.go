@@ -101,8 +101,6 @@ type BuildSpec struct {
 	Pipeline     []PipelineStep `yaml:"pipeline,omitempty"    json:"pipeline,omitempty"`
 }
 
-
-
 // PipelineSecret represents a BuildKit secret mount option.
 type PipelineSecret struct {
 	ID     string `yaml:"id"     json:"id"`
@@ -167,8 +165,6 @@ type RuntimeConfig struct {
 var supportedProviders = map[string]bool{
 	"apk": true,
 }
-
-
 
 // Interpolate performs string substitution on the raw yaml content using the vars map.
 func Interpolate(data []byte) ([]byte, error) {
@@ -325,8 +321,6 @@ func (s *Spec) Validate() error {
 	if !supportedProviders[s.Provider] {
 		errs = append(errs, fmt.Sprintf("unsupported provider %q (supported: apk)", s.Provider))
 	}
-
-
 
 	// Validate sub-build providers
 	for i, b := range s.Builds {

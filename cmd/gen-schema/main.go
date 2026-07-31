@@ -6,8 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/broadsage/doko/internal/config"
 	"github.com/google/jsonschema-go/jsonschema"
+
+	"github.com/broadsage/doko/internal/config"
 )
 
 func main() {
@@ -33,7 +34,7 @@ func main() {
 	if _, err := os.Stat("config.go"); err != nil {
 		outPath = filepath.Join("internal", "config", "schema.json")
 	}
-	if err := os.WriteFile(outPath, data, 0644); err != nil {
+	if err := os.WriteFile(outPath, data, 0o600); err != nil {
 		fmt.Fprintf(os.Stderr, "failed to write schema.json at %s: %v\n", outPath, err)
 		os.Exit(1)
 	}

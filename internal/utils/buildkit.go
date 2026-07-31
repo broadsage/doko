@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -12,7 +13,7 @@ import (
 func CopyRefToDir(ctx context.Context, ref gwclient.Reference, refPath, destDir string) error {
 	entries, err := ref.ReadDir(ctx, gwclient.ReadDirRequest{Path: refPath})
 	if err != nil {
-		return err
+		return fmt.Errorf("read dir %s: %w", refPath, err)
 	}
 	for _, e := range entries {
 		name := e.Path
@@ -23,7 +24,7 @@ func CopyRefToDir(ctx context.Context, ref gwclient.Reference, refPath, destDir 
 		dstPath := filepath.Join(destDir, filepath.FromSlash(name))
 		if e.Mode&uint32(os.ModeDir) != 0 {
 			if err := os.MkdirAll(dstPath, 0o755); err != nil {
-				return err
+				return fmt.Errorf("mkdir %s: %w", dstPath, err)
 			}
 			if err := CopyRefToDir(ctx, ref, srcPath, dstPath); err != nil {
 				return err
@@ -32,17 +33,17 @@ func CopyRefToDir(ctx context.Context, ref gwclient.Reference, refPath, destDir 
 		}
 		data, err := ref.ReadFile(ctx, gwclient.ReadRequest{Filename: srcPath})
 		if err != nil {
-			return err
+			return fmt.Errorf("read file %s: %w", srcPath, err)
 		}
 		if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
-			return err
+			return fmt.Errorf("mkdir parent %s: %w", filepath.Dir(dstPath), err)
 		}
 		mode := e.Mode & uint32(os.ModePerm)
 		if mode == 0 {
 			mode = 0o644
 		}
 		if err := os.WriteFile(dstPath, data, os.FileMode(mode)); err != nil {
-			return err
+			return fmt.Errorf("write file %s: %w", dstPath, err)
 		}
 	}
 	return nil

@@ -23,15 +23,19 @@ func (p *apkProvider) Name() string { return "apk" }
 func (p *apkProvider) ResolveBaseImage(base string) string {
 	return fmt.Sprintf("alpine:%s", SanitizeVersion(base))
 }
+
 func (p *apkProvider) KeyringDest(filename string) string {
 	return "/etc/apk/keys/" + filename
 }
+
 func (p *apkProvider) CACertDest(filename string) string {
 	return "/usr/local/share/ca-certificates/" + filename
 }
+
 func (p *apkProvider) UpdateCACertCommand() []string {
 	return []string{"update-ca-certificates"}
 }
+
 func (p *apkProvider) InstallScript(installs, removals []string) string {
 	var script string
 	if len(installs) > 0 {
@@ -42,25 +46,33 @@ func (p *apkProvider) InstallScript(installs, removals []string) string {
 	}
 	return script
 }
+
 func (p *apkProvider) CacheMounts() []buildkitllb.RunOption {
 	return []buildkitllb.RunOption{
 		buildkitllb.AddMount("/var/cache/apk", buildkitllb.Scratch(), buildkitllb.AsPersistentCacheDir("doko-apk-cache", buildkitllb.CacheMountShared)),
 	}
 }
+
 func (p *apkProvider) RemovePaths() []string {
 	return []string{"/sbin/apk", "/lib/apk", "/var/cache/apk", "/etc/apk"}
 }
+
 func (p *apkProvider) BuildPackage(ctx context.Context, spec *config.BuildSpec, sourceState buildkitllb.State, resolver buildkitllb.ImageMetaResolver, opts ...buildkitllb.ConstraintsOpt) (buildkitllb.State, error) {
 	base := spec.Base
 	if base == "" {
 		base = "alpine-3.23"
 	}
 	workerBaseImage := p.ResolveBaseImage(base)
-	return apkbuilder.BuildAPK(ctx, spec, sourceState, workerBaseImage, resolver, opts...)
+	state, err := apkbuilder.BuildAPK(ctx, spec, sourceState, workerBaseImage, resolver, opts...)
+	if err != nil {
+		return state, fmt.Errorf("build APK: %w", err)
+	}
+	return state, nil
 }
+
 func (p *apkProvider) AssemblePackage(dataDir, outPath string, spec *config.BuildSpec, arch string) (string, error) {
 	if err := apkbuilder.AssembleAPK(dataDir, outPath, spec, arch); err != nil {
-		return "", err
+		return "", fmt.Errorf("assemble APK: %w", err)
 	}
 	epoch := "0"
 	if spec.Epoch > 0 {
