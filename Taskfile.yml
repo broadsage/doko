@@ -1,0 +1,50 @@
+version: '3'
+
+tasks:
+  default:
+    desc: Build the doko binary (default task)
+    cmds:
+      - task: build
+
+  generate:
+    desc: Regenerate JSON Schema from Go structs
+    cmds:
+      - go generate ./...
+    sources:
+      - internal/config/config.go
+    generates:
+      - internal/config/schema.json
+
+  build:
+    desc: Compile the doko binary locally
+    deps: [generate]
+    cmds:
+      - go build -o ./doko ./cmd/doko/
+
+  test:
+    desc: Run the Go package test suite
+    deps: [generate]
+    cmds:
+      - go test ./... -race -count=1
+
+  lint:
+    desc: Run golangci-lint analysis
+    cmds:
+      - golangci-lint run ./...
+
+  devenv:
+    desc: Bootstrap containerised development environment
+    cmds:
+      - ./hack/make-devenv.sh
+
+  test-example:
+    desc: Run end-to-end test against an example (e.g. task test-example pkg=nginx)
+    cmds:
+      - ./hack/make-dokoenv.sh test {{.pkg}}
+    vars:
+      pkg: ""
+
+  clean:
+    desc: Remove local binaries and build files
+    cmds:
+      - rm -f ./doko

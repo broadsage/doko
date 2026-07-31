@@ -59,8 +59,14 @@ jobs:
           go-version-file: './go.mod'
           check-latest: true
 
+      - name: Install Task
+        uses: arduino/setup-task@b9e59d47aabcb583f744e73b22cf3c9593457a15 # v2.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run tests
-        run: go test ./... -race -count=1
+        run: task test
 
   goreleaser:
     name: goreleaser check

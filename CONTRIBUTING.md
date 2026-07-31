@@ -35,7 +35,7 @@ To make development easier across all platforms, we provide a script that bootst
 Run the following from the root of the repository:
 
 ```bash
-./hack/make-devenv.sh
+task devenv
 ```
 
 This will:
@@ -43,10 +43,10 @@ This will:
 2. Mount the doko repository at `/workspace` inside the container
 3. Drop you into an interactive shell
 
-Once inside the container, you can build and run doko:
+Once inside the container, you can run task commands:
 
 ```
-[doko] ❯ go build -o ./doko ./cmd/doko/
+[doko] ❯ task build
 [doko] ❯ ./doko version
 Doko - BuildKit Image Orchestrator v1.0.0-dev
 Commit: unknown
@@ -66,10 +66,10 @@ You can also develop directly on your machine without Docker.
 ### Build
 
 ```bash
-go build -o ./doko ./cmd/doko/
+task build
 ```
 
-With version metadata injected:
+With version metadata injected (manually):
 
 ```bash
 CGO_ENABLED=0 go build \
@@ -79,38 +79,26 @@ CGO_ENABLED=0 go build \
 
 ### Test & Code Generation
 
-If you modify Go structs representing the configuration schema (like `config.Spec`), you must regenerate `schema.json` using `go generate`:
+If you modify Go structs representing the configuration schema (like `config.Spec`), you must regenerate `schema.json` using `go generate`. You can run this automatically via task:
 
 ```bash
 # Regenerate schema.json
-go generate ./...
+task generate
 
 # Run all tests
-go test ./... -race -count=1
+task test
 
-# Run a specific package
+# Run a specific package (manually)
 go test ./internal/config/... -v
 
-# Run example config tests
-go test ./examples/... -v -count=1
-```
-
-Or inside Docker:
-
-```bash
-./hack/make-devenv.sh test
+# Run example config tests (e.g. nginx)
+task test-example pkg=nginx
 ```
 
 ### Lint
 
 ```bash
-golangci-lint run ./...
-```
-
-Or inside Docker:
-
-```bash
-./hack/make-devenv.sh lint
+task lint
 ```
 
 ### Build and test the doko frontend image locally

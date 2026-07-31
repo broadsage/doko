@@ -192,21 +192,20 @@ internal/
 
 ## Development
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions. Quick reference:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions. Quick reference using Taskfile:
 
 ```bash
-# Bootstrap a containerised dev environment (requires Docker)
-./hack/make-devenv.sh
-
-# Build and test the doko frontend image locally
-./hack/make-dokoenv.sh build        # build doko:local
-./hack/make-dokoenv.sh test nginx   # end-to-end test against nginx example
+# Bootstrap containerised development environment
+task devenv
 
 # Build, test, and lint locally
-go generate ./...                   # regenerate schema.json when structs change
-go build -o ./doko ./cmd/doko/
-go test ./... -race -count=1
-golangci-lint run ./...
+task generate                       # regenerate schema.json when structs change
+task build
+task test
+task lint
+
+# Run end-to-end test against nginx example
+task test-example pkg=nginx
 
 # GoReleaser snapshot build
 goreleaser build --snapshot --clean
