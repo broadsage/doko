@@ -221,13 +221,14 @@ internal/
   config/          — doko.yaml schema, types, and parsing
   llb/             — BuildKit LLB translation engine
   netutil/         — Shared HTTP client utilities
+  pipeline/        — Reusable pipeline template engine (vars, steps)
   policy/          — Compile-time CVE and license policy gates
   provenance/      — SLSA provenance attestation generation
-  resolver/        — Package resolver interface and registry
-    apk/           — Alpine APKINDEX resolver
+  providers/       — Unified provider registry (resolvers + builders)
+    apk/           — Alpine APKINDEX resolver and LLB builder
+      builder/     — APK package compilation engine and pipeline templates
   sbom/            — CycloneDX and SPDX SBOM generation
   security/        — Seccomp and Landlock profile generators
-  sign/            — Cosign image signing integration
   vulnerability/   — OSV.dev CVE scanner and VEX matcher
 docs/              — Project documentation
 examples/          — Example doko.yaml configs with integration tests

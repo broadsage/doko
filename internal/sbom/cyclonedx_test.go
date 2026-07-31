@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 func TestGenerateCycloneDX_BasicSBOM(t *testing.T) {
@@ -14,7 +14,7 @@ func TestGenerateCycloneDX_BasicSBOM(t *testing.T) {
 		Base:     "alpine-3.23",
 	}
 
-	packages := []resolver.Package{
+	packages := []providers.Package{
 		{Name: "curl", Version: "8.12.1-r0", Arch: "x86_64", License: "MIT", DownloadURL: "https://example.com/curl.apk", Checksum: "abc123"},
 	}
 

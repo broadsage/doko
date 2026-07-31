@@ -20,8 +20,8 @@ import (
 	layerkitllb "github.com/broadsage/doko/internal/llb"
 	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/policy"
-	"github.com/broadsage/doko/internal/resolver"
-	_ "github.com/broadsage/doko/internal/resolver/apk"
+	"github.com/broadsage/doko/internal/providers"
+	_ "github.com/broadsage/doko/internal/providers/apk"
 	"github.com/broadsage/doko/internal/vulnerability"
 
 	"github.com/moby/buildkit/frontend/dockerui"
@@ -91,7 +91,7 @@ func buildFunc(ctx context.Context, c client.Client) (*client.Result, error) {
 
 	var lockedPkgs map[string]string
 	if len(lockData) > 0 {
-		var lf resolver.Lockfile
+		var lf providers.Lockfile
 		if err := yaml.Unmarshal(lockData, &lf); err == nil {
 			lockedPkgs = make(map[string]string)
 			for _, p := range lf.Packages {
@@ -220,7 +220,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		}
 	}
 
-	res, err := resolver.NewResolver(spec.Provider, resolver.Options{
+	res, err := providers.NewResolver(spec.Provider, providers.Options{
 		Arch:           spec.Arch,
 		Repositories:   spec.Contents.Repositories,
 		LockedPackages: lockedPkgs,
@@ -278,7 +278,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
-	gen := layerkitllb.NewGenerator(spec)
+	gen := layerkitllb.NewGenerator(spec, c)
 	def, err := gen.Generate(ctx)
 	if err != nil {
 		return nil, err

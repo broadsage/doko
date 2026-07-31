@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 // Document represents a complete SPDX 2.3 SBOM document.
@@ -75,7 +75,7 @@ type ExtractedLicenseInfo struct {
 }
 
 // GenerateSPDX creates an SPDX 2.3 JSON SBOM from the build spec and resolved packages.
-func GenerateSPDX(spec *config.Spec, packages []resolver.Package) (*Document, error) {
+func GenerateSPDX(spec *config.Spec, packages []providers.Package) (*Document, error) {
 	namespace := fmt.Sprintf(
 		"https://doko.io/sbom/%s/%s",
 		sanitizeName(spec.Name),
@@ -173,7 +173,7 @@ func MarshalSPDX(doc *Document) ([]byte, error) {
 
 // BuildPURL constructs a Package URL (PURL) for the given package.
 // See: https://github.com/package-url/purl-spec
-func BuildPURL(provider string, pkg resolver.Package) string {
+func BuildPURL(provider string, pkg providers.Package) string {
 	if provider == "apk" {
 		return fmt.Sprintf("pkg:apk/alpine/%s@%s?arch=%s", pkg.Name, pkg.Version, pkg.Arch)
 	}

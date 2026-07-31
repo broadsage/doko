@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 // Attestation defines the SLSA-like build provenance payload structure.
@@ -33,7 +33,7 @@ type Material struct {
 }
 
 // Generate creates a LayerKit provenance attestation document.
-func Generate(spec *config.Spec, packages []resolver.Package) (*Attestation, error) {
+func Generate(spec *config.Spec, packages []providers.Package) (*Attestation, error) {
 	materials := make([]Material, 0, 2+len(packages))
 	materials = append(materials,
 		Material{URI: fmt.Sprintf("provider:%s", spec.Provider)},

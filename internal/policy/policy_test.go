@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 	"github.com/broadsage/doko/internal/vulnerability"
 )
 
@@ -20,7 +20,7 @@ func TestGate_Evaluate_Compliant(t *testing.T) {
 	g := NewGate("high", []string{"MIT", "Apache-2.0"})
 	g.WithScanner(vulnerability.NewScannerWithEndpoint(srv.URL, srv.Client()))
 
-	pkgs := []resolver.Package{
+	pkgs := []providers.Package{
 		{Name: "nginx", Version: "1.27.4-r0", License: "MIT"},
 		{Name: "curl", Version: "8.12.1-r0", License: "Apache-2.0"},
 	}
@@ -32,7 +32,7 @@ func TestGate_Evaluate_Compliant(t *testing.T) {
 
 func TestGate_Evaluate_LicenseViolation(t *testing.T) {
 	g := NewGate("high", []string{"MIT", "Apache-2.0"})
-	pkgs := []resolver.Package{
+	pkgs := []providers.Package{
 		{Name: "gpl-app", Version: "1.0", License: "GPL-3.0"},
 	}
 	if err := g.Evaluate(context.Background(), pkgs, "Alpine:v3.23"); err == nil {
@@ -62,7 +62,7 @@ func TestGate_Evaluate_CVEViolation(t *testing.T) {
 	g := NewGate("high", []string{"MIT"})
 	g.WithScanner(vulnerability.NewScannerWithEndpoint(srv.URL, srv.Client()))
 
-	pkgs := []resolver.Package{
+	pkgs := []providers.Package{
 		{Name: "dirty-package", Version: "1.0", License: "MIT"},
 	}
 	if err := g.Evaluate(context.Background(), pkgs, "Alpine:v3.23"); err == nil {
@@ -72,7 +72,7 @@ func TestGate_Evaluate_CVEViolation(t *testing.T) {
 
 func TestGate_Evaluate_NoLicenseEnforcement(t *testing.T) {
 	g := NewGate("high", nil)
-	pkgs := []resolver.Package{
+	pkgs := []providers.Package{
 		{Name: "anything", Version: "1.0", License: "WTFPL"},
 	}
 	if err := g.Evaluate(context.Background(), pkgs, "Alpine:v3.23"); err != nil {
@@ -82,7 +82,7 @@ func TestGate_Evaluate_NoLicenseEnforcement(t *testing.T) {
 
 func TestGate_Evaluate_EmptyLicenseInPackage(t *testing.T) {
 	g := NewGate("high", []string{"MIT"})
-	pkgs := []resolver.Package{
+	pkgs := []providers.Package{
 		{Name: "libc6", Version: "2.41", License: ""},
 	}
 	// Empty license in package should pass — packages often lack license in index

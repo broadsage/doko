@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 // CycloneDXDocument represents a CycloneDX 1.6 JSON SBOM.
@@ -61,7 +61,7 @@ type CycloneDXHash struct {
 }
 
 // GenerateCycloneDX creates a CycloneDX 1.6 JSON SBOM document.
-func GenerateCycloneDX(spec *config.Spec, packages []resolver.Package) (*CycloneDXDocument, error) {
+func GenerateCycloneDX(spec *config.Spec, packages []providers.Package) (*CycloneDXDocument, error) {
 	doc := &CycloneDXDocument{
 		BOMFormat:   "CycloneDX",
 		SpecVersion: "1.6",

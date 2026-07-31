@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 	"github.com/broadsage/doko/internal/sbom"
 	"github.com/broadsage/doko/internal/vulnerability"
 )
@@ -47,7 +47,7 @@ func (g *Gate) WithVEXMatcher(m *vulnerability.VEXMatcher) *Gate {
 
 // Evaluate checks packages for vulnerabilities and license compliance.
 // Returns an error describing the first violation found.
-func (g *Gate) Evaluate(ctx context.Context, packages []resolver.Package, ecosystem string) error {
+func (g *Gate) Evaluate(ctx context.Context, packages []providers.Package, ecosystem string) error {
 	// 1. License Check
 	for _, pkg := range packages {
 		if err := g.checkLicense(pkg); err != nil {
@@ -89,7 +89,7 @@ func (g *Gate) Evaluate(ctx context.Context, packages []resolver.Package, ecosys
 }
 
 // checkLicense verifies the package license is in the allowed list.
-func (g *Gate) checkLicense(pkg resolver.Package) error {
+func (g *Gate) checkLicense(pkg providers.Package) error {
 	if len(g.AllowedLicenses) == 0 || pkg.License == "" {
 		return nil
 	}

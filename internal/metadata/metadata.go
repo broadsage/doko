@@ -13,14 +13,14 @@ import (
 
 	"github.com/broadsage/doko/internal/config"
 	"github.com/broadsage/doko/internal/provenance"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 	"github.com/broadsage/doko/internal/sbom"
 	"github.com/broadsage/doko/internal/security"
 )
 
 // AttachAll generates SBOMs, SLSA provenance, sandbox profiles, and OCI image configurations,
 // attaching all of them to the Solve result.
-func AttachAll(ctx context.Context, spec *config.Spec, resolvedPkgs []resolver.Package, result *client.Result) error {
+func AttachAll(ctx context.Context, spec *config.Spec, resolvedPkgs []providers.Package, result *client.Result) error {
 	// 1. Generate and attach SBOMs
 	if err := attachSBOMs(spec, resolvedPkgs, result); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "[doko] warning: failed to attach SBOMs: %v\n", err)
@@ -45,7 +45,7 @@ func AttachAll(ctx context.Context, spec *config.Spec, resolvedPkgs []resolver.P
 }
 
 // attachSBOMs generates and embeds the SBOMs (SPDX, CycloneDX) in the build result meta.
-func attachSBOMs(spec *config.Spec, packages []resolver.Package, result *client.Result) error {
+func attachSBOMs(spec *config.Spec, packages []providers.Package, result *client.Result) error {
 	formats := spec.Security.SBOM.Formats
 	if len(formats) == 0 {
 		formats = []string{"spdx"}
@@ -82,7 +82,7 @@ func attachSBOMs(spec *config.Spec, packages []resolver.Package, result *client.
 }
 
 // attachProvenance generates and embeds SLSA-style build provenance.
-func attachProvenance(spec *config.Spec, packages []resolver.Package, result *client.Result) error {
+func attachProvenance(spec *config.Spec, packages []providers.Package, result *client.Result) error {
 	att, err := provenance.Generate(spec, packages)
 	if err != nil {
 		return fmt.Errorf("failed to generate provenance: %w", err)

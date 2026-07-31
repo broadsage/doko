@@ -18,7 +18,7 @@ readonly LOCAL_IMAGE="doko:local"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly EXAMPLES_DIR="${REPO_ROOT}/examples"
-readonly VALID_EXAMPLES=(nginx redis postgres python-api)
+readonly VALID_EXAMPLES=($(find "${REPO_ROOT}/examples" -mindepth 2 -maxdepth 2 -name 'doko.yaml' -exec dirname {} \; | xargs -n1 basename | sort))
 
 
 log_info()  { echo "[doko] $*"; }

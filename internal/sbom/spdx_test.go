@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 func TestGenerateSPDX_BasicSBOM(t *testing.T) {
@@ -15,7 +15,7 @@ func TestGenerateSPDX_BasicSBOM(t *testing.T) {
 		Base:     "alpine-3.23",
 	}
 
-	packages := []resolver.Package{
+	packages := []providers.Package{
 		{Name: "curl", Version: "8.12.1-r0", Arch: "x86_64", License: "MIT", DownloadURL: "https://example.com/curl.apk", Checksum: "abc123"},
 		{Name: "nginx", Version: "1.27.4-r0", Arch: "x86_64", License: "BSD-2-Clause", DownloadURL: "https://example.com/nginx.apk"},
 	}
@@ -87,11 +87,11 @@ func TestMarshalSPDX_ValidJSON(t *testing.T) {
 func TestBuildPURL(t *testing.T) {
 	tests := []struct {
 		provider string
-		pkg      resolver.Package
+		pkg      providers.Package
 		expected string
 	}{
-		{"apk", resolver.Package{Name: "curl", Version: "8.12.1-r0", Arch: "x86_64"}, "pkg:apk/alpine/curl@8.12.1-r0?arch=x86_64"},
-		{"unknown", resolver.Package{Name: "test"}, ""},
+		{"apk", providers.Package{Name: "curl", Version: "8.12.1-r0", Arch: "x86_64"}, "pkg:apk/alpine/curl@8.12.1-r0?arch=x86_64"},
+		{"unknown", providers.Package{Name: "test"}, ""},
 	}
 
 	for _, tc := range tests {

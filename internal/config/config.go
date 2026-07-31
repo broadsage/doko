@@ -25,7 +25,7 @@ type Spec struct {
 	Arch           string            `yaml:"arch"      json:"arch,omitempty"` // amd64, arm64 — defaults to amd64
 	Security       SecurityConfig    `yaml:"security"  json:"security"`
 	Contents       ContentsConfig    `yaml:"contents"  json:"contents"`
-	Builds         []SubBuild        `yaml:"builds"    json:"builds,omitempty"`
+	Builds         []BuildSpec       `yaml:"builds"    json:"builds,omitempty"`
 	Runtime        RuntimeConfig     `yaml:"runtime"   json:"runtime"`
 	Accounts       AccountsConfig    `yaml:"accounts"  json:"accounts,omitempty"`
 	Environment    map[string]string `yaml:"environment" json:"environment,omitempty"`
@@ -75,14 +75,23 @@ type Group struct {
 // SubBuild represents a distinct build stage.
 // Each sub-build can optionally override the top-level base image and provider,
 // enabling patterns like compiling from source in a dev base and copying into runtime.
-type SubBuild struct {
-	Name       string         `yaml:"name"       json:"name"`
-	Base       string         `yaml:"base"       json:"base,omitempty"`
-	Provider   string         `yaml:"provider"   json:"provider,omitempty"`
-	WorkDir    string         `yaml:"work-dir"   json:"work-dir,omitempty"`
-	Privileged bool           `yaml:"privileged" json:"privileged,omitempty"`
-	Contents   ContentsConfig `yaml:"contents"   json:"contents"`
-	Outputs    []Output       `yaml:"outputs"    json:"outputs,omitempty"`
+// BuildSpec represents a distinct build stage or custom package compilation pipeline.
+type BuildSpec struct {
+	Name         string         `yaml:"name"                  json:"name"`
+	Version      string         `yaml:"version,omitempty"     json:"version,omitempty"`
+	Epoch        int            `yaml:"epoch,omitempty"       json:"epoch,omitempty"`
+	Description  string         `yaml:"description,omitempty" json:"description,omitempty"`
+	URL          string         `yaml:"url,omitempty"         json:"url,omitempty"`
+	License      string         `yaml:"license,omitempty"     json:"license,omitempty"`
+	Dependencies []string       `yaml:"dependencies,omitempty" json:"dependencies,omitempty"`
+	Base         string         `yaml:"base,omitempty"        json:"base,omitempty"`
+	Provider     string         `yaml:"provider,omitempty"    json:"provider,omitempty"`
+	WorkDir      string         `yaml:"work-dir,omitempty"    json:"work-dir,omitempty"`
+	SourceDir    string         `yaml:"source-dir,omitempty"  json:"source-dir,omitempty"`
+	Privileged   bool           `yaml:"privileged,omitempty"  json:"privileged,omitempty"`
+	Contents     ContentsConfig `yaml:"contents,omitempty"    json:"contents,omitempty"`
+	Outputs      []Output       `yaml:"outputs,omitempty"     json:"outputs,omitempty"`
+	Pipeline     []PipelineStep `yaml:"pipeline,omitempty"    json:"pipeline,omitempty"`
 }
 
 // HardeningConfig defines declarative OS hardening settings.
@@ -127,10 +136,12 @@ type PipelineSecret struct {
 	Target string `yaml:"target" json:"target"`
 }
 
-// PipelineStep represents a single build script runner.
+// PipelineStep represents a single build script runner or template step.
 type PipelineStep struct {
 	Name    string           `yaml:"name,omitempty" json:"name,omitempty"`
-	Runs    string           `yaml:"runs"           json:"runs"`
+	Runs    string           `yaml:"runs,omitempty" json:"runs,omitempty"`
+	Uses    string           `yaml:"uses,omitempty" json:"uses,omitempty"`
+	With    map[string]any   `yaml:"with,omitempty" json:"with,omitempty"`
 	SSH     bool             `yaml:"ssh,omitempty"  json:"ssh,omitempty"`
 	Secrets []PipelineSecret `yaml:"secrets,omitempty" json:"secrets,omitempty"`
 	Network string           `yaml:"network,omitempty" json:"network,omitempty"`

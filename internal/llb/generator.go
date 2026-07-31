@@ -5,24 +5,39 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
+	gwclient "github.com/moby/buildkit/frontend/gateway/client"
 	"github.com/moby/buildkit/solver/pb"
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/broadsage/doko/internal/config"
+	"github.com/broadsage/doko/internal/providers"
+	"github.com/broadsage/doko/internal/providers/apk/builder"
 )
+
+type localAPK struct {
+	filename string
+	bytes    []byte
+}
 
 // Generator translates a parsed LayerKit spec into a BuildKit LLB state.
 type Generator struct {
-	Spec *config.Spec
+	Spec      *config.Spec
+	Client    gwclient.Client
+	localAPKs map[string]localAPK
 }
 
-// NewGenerator creates a new LLB generator from a parsed spec.
-func NewGenerator(spec *config.Spec) *Generator {
-	return &Generator{Spec: spec}
+// NewGenerator creates a new LLB generator from a parsed spec and BuildKit client.
+func NewGenerator(spec *config.Spec, c gwclient.Client) *Generator {
+	return &Generator{
+		Spec:      spec,
+		Client:    c,
+		localAPKs: make(map[string]localAPK),
+	}
 }
 
 // Generate builds the full LLB definition representing the target container image.
@@ -41,11 +56,26 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 	// Build sub-stages first
 	subBuilds := make(map[string]buildkitllb.State)
 	for _, b := range g.Spec.Builds {
-		stageState, err := g.buildSubStage(platform, baseRef, b)
-		if err != nil {
-			return nil, fmt.Errorf("failed to build stage %s: %w", b.Name, err)
+		if len(b.Pipeline) > 0 {
+			// Compile and assemble APK package
+			apkBytes, apkName, err := g.compilePackage(ctx, b)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compile package %s: %w", b.Name, err)
+			}
+			g.localAPKs[b.Name] = localAPK{filename: apkName, bytes: apkBytes}
+
+			builtState, err := builder.BuildAPK(ctx, &b, buildkitllb.Local("context"), nil)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build stage for %s: %w", b.Name, err)
+			}
+			subBuilds[b.Name] = builtState
+		} else {
+			stageState, err := g.buildSubStage(platform, baseRef, b)
+			if err != nil {
+				return nil, fmt.Errorf("failed to build stage %s: %w", b.Name, err)
+			}
+			subBuilds[b.Name] = stageState
 		}
-		subBuilds[b.Name] = stageState
 	}
 
 	// 2. Bootstrap base OS layout starting from scratch to drop parent history
@@ -99,7 +129,7 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 
 // buildSubStage builds a named build stage filesystem state.
 // If the sub-build has its own Base/Provider, those override the top-level spec values.
-func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b config.SubBuild) (buildkitllb.State, error) {
+func (g *Generator) buildSubStage(platform ocispecs.Platform, baseRef string, b config.BuildSpec) (buildkitllb.State, error) {
 	// Resolve per-stage base image and provider if specified
 	stageBaseRef := baseRef
 	provider := g.Spec.Provider
@@ -146,28 +176,47 @@ func (g *Generator) installPackages(base buildkitllb.State) (buildkitllb.State, 
 }
 
 func (g *Generator) installPackagesForContentsWithProvider(base buildkitllb.State, contents config.ContentsConfig, providerName string) (buildkitllb.State, error) {
-	p, err := GetProvider(providerName)
+	p, err := providers.GetBuilder(providerName)
 	if err != nil {
 		return base, err
 	}
 
 	var installs []string
 	var removals []string
+	var localApkPackages []localAPK
+
 	for _, pkg := range contents.Packages {
 		if remainder, ok := strings.CutPrefix(pkg, "!"); ok {
 			removals = append(removals, remainder)
 		} else {
-			installs = append(installs, pkg)
+			if lapk, ok := g.localAPKs[pkg]; ok {
+				localApkPackages = append(localApkPackages, lapk)
+			} else {
+				installs = append(installs, pkg)
+			}
 		}
 	}
 	sort.Strings(installs)
 	sort.Strings(removals)
 
-	if len(installs) == 0 && len(removals) == 0 {
+	if len(installs) == 0 && len(removals) == 0 && len(localApkPackages) == 0 {
 		return base, nil
 	}
 
+	if len(localApkPackages) > 0 {
+		base = base.File(buildkitllb.Mkdir("/tmp/packages", 0755, buildkitllb.WithParents(true)))
+		for _, lapk := range localApkPackages {
+			destPath := "/tmp/packages/" + lapk.filename
+			base = base.File(buildkitllb.Mkfile(destPath, 0644, lapk.bytes))
+		}
+	}
+
 	script := p.InstallScript(installs, removals)
+	if len(localApkPackages) > 0 {
+		script = "apk add --no-cache --allow-untrusted /tmp/packages/*.apk\n" + script
+		script += "\nrm -rf /tmp/packages\n"
+	}
+
 	if script == "" {
 		return base, nil
 	}
@@ -332,7 +381,7 @@ func sanitizeBaseTag(base string) string {
 // resolveBaseImageFor maps a provider + base combo to a container image reference.
 // Used for sub-builds that override the top-level base.
 func resolveBaseImageFor(providerName, base string) string {
-	p, err := GetProvider(providerName)
+	p, err := providers.GetBuilder(providerName)
 	if err != nil {
 		return base
 	}
@@ -455,7 +504,7 @@ func (g *Generator) applyHardening(state buildkitllb.State) buildkitllb.State {
 
 	// 1. Remove Package Manager natively
 	if hcfg.RemovePackageManager {
-		p, err := GetProvider(g.Spec.Provider)
+		p, err := providers.GetBuilder(g.Spec.Provider)
 		if err == nil {
 			paths := p.RemovePaths()
 			if len(paths) > 0 {
@@ -640,7 +689,7 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 
 // runUpdateCAsFor runs update-ca-certificates/update-ca-trust for a given provider with dynamic CA certs mounts.
 func runUpdateCAsFor(state buildkitllb.State, providerName string, contents config.ContentsConfig) buildkitllb.State {
-	p, err := GetProvider(providerName)
+	p, err := providers.GetBuilder(providerName)
 	if err != nil {
 		return state
 	}
@@ -672,4 +721,109 @@ func runUpdateCAsFor(state buildkitllb.State, providerName string, contents conf
 		state = state.Run(runOpts...).Root()
 	}
 	return state
+}
+
+func (g *Generator) compilePackage(ctx context.Context, b config.BuildSpec) ([]byte, string, error) {
+	if g.Client == nil {
+		return nil, "", fmt.Errorf("BuildKit gateway client is not initialized")
+	}
+
+	builtState, err := builder.BuildAPK(ctx, &b, buildkitllb.Local("context"), nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to build compilation state: %w", err)
+	}
+
+	def, err := builtState.Marshal(ctx)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to marshal compilation state: %w", err)
+	}
+
+	res, err := g.Client.Solve(ctx, gwclient.SolveRequest{
+		Definition: def.ToPB(),
+	})
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to solve compilation state: %w", err)
+	}
+
+	ref, err := res.SingleRef()
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get solved reference: %w", err)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "doko-apk-*")
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	const targetsOutDir = "/workspace/build-out"
+	if err := copyRefToDir(ctx, ref, targetsOutDir, tmpDir); err != nil {
+		return nil, "", fmt.Errorf("failed to copy output files from solved reference: %w", err)
+	}
+
+	dataDir := tmpDir
+	if info, err := os.Stat(filepath.Join(tmpDir, "build-out")); err == nil && info.IsDir() {
+		dataDir = filepath.Join(tmpDir, "build-out")
+	}
+
+	apkPath := filepath.Join(tmpDir, "out.apk")
+	arch := g.Spec.Arch
+	if arch == "" {
+		arch = "amd64"
+	}
+	if err := builder.AssembleAPK(dataDir, apkPath, &b, arch); err != nil {
+		return nil, "", fmt.Errorf("failed to assemble APK: %w", err)
+	}
+
+	apkBytes, err := os.ReadFile(apkPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read assembled APK file: %w", err)
+	}
+
+	epoch := "0"
+	if b.Epoch > 0 {
+		epoch = fmt.Sprintf("%d", b.Epoch)
+	}
+	apkName := fmt.Sprintf("%s-%s-r%s.apk", strings.ToLower(b.Name), b.Version, epoch)
+
+	return apkBytes, apkName, nil
+}
+
+func copyRefToDir(ctx context.Context, ref gwclient.Reference, refPath, destDir string) error {
+	entries, err := ref.ReadDir(ctx, gwclient.ReadDirRequest{Path: refPath})
+	if err != nil {
+		return err
+	}
+	for _, e := range entries {
+		name := e.Path
+		if name == "" || name == "." || name == ".." {
+			continue
+		}
+		srcPath := refPath + "/" + name
+		dstPath := filepath.Join(destDir, filepath.FromSlash(name))
+		if e.Mode&uint32(os.ModeDir) != 0 {
+			if err := os.MkdirAll(dstPath, 0o755); err != nil {
+				return err
+			}
+			if err := copyRefToDir(ctx, ref, srcPath, dstPath); err != nil {
+				return err
+			}
+			continue
+		}
+		data, err := ref.ReadFile(ctx, gwclient.ReadRequest{Filename: srcPath})
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+			return err
+		}
+		mode := e.Mode & uint32(os.ModePerm)
+		if mode == 0 {
+			mode = 0o644
+		}
+		if err := os.WriteFile(dstPath, data, os.FileMode(mode)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

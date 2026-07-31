@@ -29,6 +29,7 @@ Doko validates the schema at **build-time** and rejects any configuration that v
   - [`contents.keyring`](#contentskeyring)
   - [`contents.paths`](#contentspaths)
   - [`contents.pipeline`](#contentspipeline)
+  - [Available Pipeline Templates](#available-pipeline-templates)
 - [`artifacts` — External OCI Artifacts](#artifacts--external-oci-artifacts)
 - [`runtime` — Container Runtime Configuration](#runtime--container-runtime-configuration)
 - [`stop-signal` — Process Stop Signal](#stop-signal--process-stop-signal)
@@ -290,6 +291,10 @@ accounts:
 
 **Purpose:** Define named build stages that produce artifacts (binaries, configuration, compiled assets) without those build tools being present in the final image. Mirrors `FROM ... AS builder` in Dockerfiles but with a declarative, self-documenting schema.
 
+Builds can also define **custom package compilation pipelines** using reusable template steps (e.g. `fetch`, `configure`, `make`, `install`). When a build spec includes `version` and `pipeline` fields, Doko compiles the package from source in an isolated BuildKit stage, assembles a local `.apk` archive, and injects it directly into the final image.
+
+### Standard Sub-Build (artifact copy)
+
 ```yaml
 builds:
   - name: app-builder
@@ -316,15 +321,49 @@ builds:
             cd /build && go build -o /usr/local/bin/app ./cmd/app
 ```
 
+### Custom Package Compilation Pipeline
+
+```yaml
+builds:
+  - name: my-custom-lib
+    version: "2.4.1"
+    epoch: 0
+    description: "Custom library compiled from source"
+    url: https://example.com/my-custom-lib
+    license: MIT
+    dependencies:
+      - libc-dev
+      - gcc
+    source-dir: /home/build
+    pipeline:
+      - uses: fetch
+        with:
+          uri: https://example.com/my-custom-lib-2.4.1.tar.gz
+          expected-sha256: abc123...
+      - uses: configure
+        with:
+          opts: --prefix=/usr --disable-static
+      - uses: make
+      - uses: install
+```
+
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | Required. Unique identifier for this build stage. Referenced in build logs. |
+| `version` | `string` | Package version string. Required for custom compilation pipelines. |
+| `epoch` | `int` | Package epoch for versioning overrides (defaults to `0`). |
+| `description` | `string` | Human-readable description embedded in the compiled package metadata. |
+| `url` | `string` | Upstream project URL for the package. |
+| `license` | `string` | SPDX license identifier for the compiled package. |
+| `dependencies` | `[]string` | Build-time dependencies installed in the compilation stage. |
 | `base` | `string` | Override the base image for this specific stage (e.g. `golang:1.22-alpine`). |
 | `provider` | `string` | Override the package manager for this stage (`apk`). Auto-detected from `base` if omitted. |
 | `work-dir` | `string` | Sets the working directory context inside the sub-build container for pipeline execution. |
+| `source-dir` | `string` | Sets the source directory for compilation pipeline steps (defaults to `/home/build`). |
 | `privileged` | `bool` | Runs the sub-build stage pipeline commands in privileged mode (enables `security.insecure` entitlement). |
 | `outputs` | `[]Output` | **Producer-Push model.** Declares which paths this stage exports into the final image. |
 | `contents` | `object` | Packages, paths, and pipeline steps for this stage. Supports all [`contents`](#contents--main-stage-contents) sub-fields. |
+| `pipeline` | `[]PipelineStep` | Build-level pipeline steps for custom package compilation. Supports `uses` template references. |
 
 ### `builds[].outputs`
 
@@ -429,9 +468,14 @@ contents:
 
 Execute custom shell commands as discrete, named build steps. Use this **only for logic that cannot be expressed declaratively** (e.g. writing generated config files, creating symlinks, running initialisation scripts).
 
+Pipeline steps support two modes:
+1. **Inline scripts** — Use `runs:` to execute arbitrary shell commands.
+2. **Reusable templates** — Use `uses:` to reference a named pipeline template (e.g. `fetch`, `configure`, `make`, `install`). Templates are resolved from the provider's embedded step definitions.
+
 ```yaml
 contents:
   pipeline:
+    # Inline script step
     - name: write-nginx-config
       runs: |
         cat << 'EOF' > /etc/nginx/http.d/default.conf
@@ -440,19 +484,37 @@ contents:
         }
         EOF
 
-    - name: configure-log-symlinks
-      runs: |
-        ln -sf /dev/stdout /var/log/nginx/access.log
-        ln -sf /dev/stderr /var/log/nginx/error.log
+    # Template-based step (for custom package compilation)
+    - uses: fetch
+      with:
+        uri: https://example.com/src.tar.gz
+        expected-sha256: abc123...
 ```
 
 | Field | Type | Description |
 |---|---|---|
 | `name` | `string` | Human-readable label for this step. Shown in BuildKit build logs. |
-| `runs` | `string` | Required. Shell script executed via `/bin/sh -c`. |
+| `runs` | `string` | Shell script executed via `/bin/sh -c`. Mutually exclusive with `uses`. |
+| `uses` | `string` | Name of a reusable pipeline template to execute (e.g. `fetch`, `configure`, `make`, `install`). Mutually exclusive with `runs`. |
+| `with` | `map[string]any` | Key-value parameters passed to a template step. Only used with `uses`. |
 | `ssh` | `boolean` | Optional. Set to `true` to mount the host's forwarded SSH agent socket securely at `/run/ssh-agent.sock` and set the `SSH_AUTH_SOCK` environment variable. |
+| `secrets` | `[]PipelineSecret` | Optional. List of BuildKit secret mounts to make available during this step. Each requires `id` and `target`. |
+| `network` | `string` | Optional. Network mode for this step (e.g. `none`, `host`). Defaults to the BuildKit default. |
 
-> **Best Practice:** Do not use `pipeline` to create directories or set ownership — use `paths:` for those. Reserve `pipeline` for logic that genuinely requires shell execution.
+### Available Pipeline Templates
+
+| Template | Description | Key `with` Parameters |
+|---|---|---|
+| `fetch` | Download and extract a source archive | `uri`, `expected-sha256`, `extract` |
+| `configure` | Run `./configure` with options | `opts` |
+| `make` | Run `make` with optional targets | `opts`, `install-dir` |
+| `install` | Run `make install` | `prefix` |
+| `patch` | Apply patches | `patches` |
+| `cmake` | CMake build step | `opts` |
+| `meson` | Meson build step | `opts` |
+| `strip` | Strip debug symbols from binaries | `paths` |
+
+> **Best Practice:** Do not use `pipeline` to create directories or set ownership — use `paths:` for those. Reserve `pipeline` for logic that genuinely requires shell execution or template-based compilation.
 
 ---
 
@@ -697,5 +759,4 @@ entrypoint: ["nginx", "-g", "daemon off;"]
 runtime:
   ports:
     - 8080
-```
 ```

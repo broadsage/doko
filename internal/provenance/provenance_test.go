@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 func TestGenerate_Provenance(t *testing.T) {
@@ -16,7 +16,7 @@ func TestGenerate_Provenance(t *testing.T) {
 		Arch:     "amd64",
 	}
 
-	packages := []resolver.Package{
+	packages := []providers.Package{
 		{
 			Name:        "musl",
 			Version:     "1.2.4-r2",

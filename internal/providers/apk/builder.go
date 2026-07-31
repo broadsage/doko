@@ -1,14 +1,16 @@
-package llb
+package apk
 
 import (
 	"fmt"
 	"strings"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
+
+	"github.com/broadsage/doko/internal/providers"
 )
 
 func init() {
-	RegisterProvider("apk", &apkProvider{})
+	providers.RegisterBuilder("apk", &apkProvider{})
 }
 
 // apkProvider is the concrete implementation of PackageManager for APK.
@@ -44,4 +46,15 @@ func (p *apkProvider) CacheMounts() []buildkitllb.RunOption {
 }
 func (p *apkProvider) RemovePaths() []string {
 	return []string{"/sbin/apk", "/lib/apk", "/var/cache/apk", "/etc/apk"}
+}
+
+func sanitizeBaseTag(base string) string {
+	if remainder, cut := strings.CutPrefix(base, "alpine-"); cut {
+		tag := remainder
+		for _, suffix := range []string{"-minimal", "-slim", "-base"} {
+			tag = strings.TrimSuffix(tag, suffix)
+		}
+		return tag
+	}
+	return base
 }

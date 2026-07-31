@@ -14,7 +14,7 @@ import (
 	"sync"
 
 	"github.com/broadsage/doko/internal/netutil"
-	"github.com/broadsage/doko/internal/resolver"
+	"github.com/broadsage/doko/internal/providers"
 )
 
 const (
@@ -32,7 +32,7 @@ func defaultRepos(version, arch string) []string {
 }
 
 func init() {
-	resolver.RegisterProvider(providerName, newAPKResolver)
+	providers.RegisterResolver(providerName, newAPKResolver)
 }
 
 // apkResolver resolves packages by parsing Alpine APKINDEX files.
@@ -60,7 +60,7 @@ type apkEntry struct {
 	Checksum     string
 }
 
-func newAPKResolver(opts resolver.Options) (resolver.Resolver, error) {
+func newAPKResolver(opts providers.Options) (providers.Resolver, error) {
 	arch := opts.Arch
 	switch arch {
 	case "", "amd64":
@@ -101,7 +101,7 @@ func (r *apkResolver) Name() string { return "Alpine APK" }
 
 // Resolve fetches the APKINDEX (if not cached), then looks up every requested
 // package and its transitive dependencies.
-func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]resolver.Package, error) {
+func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]providers.Package, error) {
 	r.indexOnce.Do(func() {
 		r.index = make(map[string]*apkEntry)
 		for _, repo := range r.repos {
@@ -116,7 +116,7 @@ func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]resolve
 	}
 
 	seen := map[string]bool{}
-	var resolved []resolver.Package
+	var resolved []providers.Package
 	var queue []string
 	queue = append(queue, packages...)
 
@@ -139,7 +139,7 @@ func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]resolve
 			resolvedVersion = lockedVersion
 		}
 
-		resolved = append(resolved, resolver.Package{
+		resolved = append(resolved, providers.Package{
 			Name:         entry.Name,
 			Version:      resolvedVersion,
 			Arch:         entry.Arch,

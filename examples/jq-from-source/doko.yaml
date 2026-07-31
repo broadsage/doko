@@ -1,0 +1,120 @@
+# syntax=ghcr.io/broadsage/doko:v1
+
+# Example: Build jq from source using pipeline templates.
+#
+# This demonstrates Doko's pipeline compilation feature:
+#   - fetch: Downloads and verifies the source tarball
+#   - autoconf/configure: Runs ./configure with options
+#   - autoconf/make: Compiles the project
+#   - autoconf/make-install: Installs into a staging directory
+#   - strip: Strips debug symbols from binaries
+#
+# The compiled jq binary is packaged as a local .apk and injected
+# into the final image — no build tools (gcc, make, autoconf) remain.
+
+name: jq from source
+image: ghcr.io/broadsage/doko/jq
+variant: production
+timeout-seconds: 120
+tags:
+  - latest
+  - "1.7.1"
+  - 1.7.1-alpine
+platforms:
+  - linux/amd64
+  - linux/arm64
+dates:
+  release: "2026-07-30"
+
+vars:
+  JQ_VERSION: "1.7.1"
+
+annotations:
+  org.opencontainers.image.title: "jq from source"
+  org.opencontainers.image.description: "jq compiled from source using Doko pipeline templates"
+  org.opencontainers.image.version: "${JQ_VERSION}"
+  org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
+
+security:
+  policy:
+    fail-on-cve: high
+    allowed-licenses:
+      - MIT
+      - ISC
+      - BSD-2-Clause
+      - BSD-3-Clause
+  profiles:
+    - seccomp
+
+# Custom package compilation using pipeline templates.
+# jq is compiled from source in an isolated BuildKit stage.
+# Only the resulting .apk is injected into the final image.
+builds:
+  - name: jq
+    version: "${JQ_VERSION}"
+    epoch: 0
+    description: "Lightweight command-line JSON processor"
+    url: https://jqlang.github.io/jq/
+    license: MIT
+    dependencies:
+      - oniguruma
+    contents:
+      packages:
+        - pkgconfig
+        - oniguruma-dev
+    pipeline:
+      # Step 1: Download and verify the source tarball
+      - uses: fetch
+        with:
+          uri: https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-${JQ_VERSION}.tar.gz
+          expected-sha256: 478c9ca129fd2e3443fe27314b455e211e0d8c60bc8ff7df703873deeee580c2
+
+      # Step 2: Run ./configure with standard Alpine paths
+      - uses: autoconf/configure
+        with:
+          opts: --disable-static --enable-shared CFLAGS="-std=gnu99 -Wno-error=incompatible-pointer-types -Wno-error=int-conversion"
+
+      # Step 3: Compile with parallel make
+      - uses: autoconf/make
+
+      # Step 4: Install into the staging directory
+      - uses: autoconf/make-install
+
+      # Step 4.5: Clean up oniguruma files to avoid conflicts with system package
+      - name: clean-oniguruma-files
+        runs: |
+          rm -f ${{targets.destdir}}/usr/bin/onig-config
+          rm -f ${{targets.destdir}}/usr/include/onig*
+          rm -f ${{targets.destdir}}/usr/lib/libonig*
+          rm -rf ${{targets.destdir}}/usr/lib/pkgconfig/oniguruma.pc
+
+      # Step 5: Strip debug symbols to minimise binary size
+      - uses: strip
+
+# Final image: only jq binary + oniguruma runtime library.
+# Zero build tools remain.
+contents:
+  packages:
+    - jq
+    - oniguruma
+    - "!ca-certificates"
+    - "!telnet"
+    - "!gawk"
+
+accounts:
+  root: false
+  run-as: nonroot
+  users:
+    - name: nonroot
+      uid: 65532
+      gid: 65532
+  groups:
+    - name: nonroot
+      gid: 65532
+      members:
+        - nonroot
+
+work-dir: /home/nonroot
+
+entrypoint: ["jq"]
+cmd: ["--help"]

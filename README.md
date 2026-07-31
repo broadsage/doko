@@ -134,6 +134,22 @@ builds:
           runs: go build -o /usr/local/bin/app ./cmd/app
 ```
 
+**Custom Package Compilation Pipelines**
+Build packages from source using reusable pipeline templates (e.g. `fetch`, `configure`, `make`, `install`) and inject the resulting `.apk` files directly into the final image:
+```yaml
+builds:
+  - name: my-custom-pkg
+    version: "1.2.3"
+    license: MIT
+    pipeline:
+      - uses: fetch
+        with:
+          uri: https://example.com/src.tar.gz
+      - uses: configure
+      - uses: make
+      - uses: install
+```
+
 **External OCI Artifact Imports**
 Pull individual files from any OCI image without defining a full build stage:
 ```yaml
@@ -179,13 +195,14 @@ internal/
   config/           — doko.yaml schema, types, and validation
   llb/              — BuildKit LLB translation engine
   netutil/          — Shared HTTP client utilities
+  pipeline/         — Reusable pipeline template engine (vars, steps)
   policy/           — Compile-time CVE and license policy gates
   provenance/       — SLSA provenance attestation generation
-  resolver/         — Package resolver interface and registry
-    apk/            — Alpine APKINDEX resolver
+  providers/        — Unified provider registry (resolvers + builders)
+    apk/            — Alpine APKINDEX resolver and LLB builder
+      builder/      — APK package compilation engine and pipeline templates
   sbom/             — CycloneDX and SPDX SBOM generation
   security/         — Seccomp and Landlock profile generators
-  sign/             — Cosign image signing integration
   vulnerability/    — OSV.dev CVE scanner and VEX matcher
 ```
 
