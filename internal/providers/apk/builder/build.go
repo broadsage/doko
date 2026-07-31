@@ -234,7 +234,7 @@ func ResolvePipelineSteps(s *config.BuildSpec) ([]ResolvedStep, error) {
 }
 
 // BuildAPK produces an llb.State that contains built .apk package(s).
-func BuildAPK(ctx context.Context, s *config.BuildSpec, sourceState llb.State, resolver llb.ImageMetaResolver, opts ...llb.ConstraintsOpt) (llb.State, error) {
+func BuildAPK(ctx context.Context, s *config.BuildSpec, sourceState llb.State, workerBaseImage string, resolver llb.ImageMetaResolver, opts ...llb.ConstraintsOpt) (llb.State, error) {
 	if s.Name == "" {
 		return llb.Scratch(), errors.New("spec name is required")
 	}
@@ -252,9 +252,9 @@ func BuildAPK(ctx context.Context, s *config.BuildSpec, sourceState llb.State, r
 	}
 
 	// Worker: Alpine + environment packages from spec (repositories + packages) + pipeline needs (deduplicated)
-	workerImage := llb.Image(alpineImage, llb.WithCustomName("apk worker base"))
+	workerImage := llb.Image(workerBaseImage, llb.WithCustomName("apk worker base"))
 	if resolver != nil {
-		workerImage = llb.Image(alpineImage, llb.WithMetaResolver(resolver), llb.WithCustomName("apk worker base"))
+		workerImage = llb.Image(workerBaseImage, llb.WithMetaResolver(resolver), llb.WithCustomName("apk worker base"))
 	}
 	installCmd, err := buildInstallCommand(s)
 	if err != nil {

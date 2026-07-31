@@ -7,6 +7,9 @@ import (
 	"time"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
+	"github.com/moby/buildkit/frontend/gateway/client"
+
+	"github.com/broadsage/doko/internal/config"
 )
 
 // Package represents a resolved dependency from any package ecosystem.
@@ -38,6 +41,8 @@ type PackageManager interface {
 	InstallScript(installs, removals []string) string
 	CacheMounts() []buildkitllb.RunOption
 	RemovePaths() []string
+	BuildPackage(ctx context.Context, spec *config.BuildSpec, sourceState buildkitllb.State, resolver buildkitllb.ImageMetaResolver, opts ...buildkitllb.ConstraintsOpt) (buildkitllb.State, error)
+	AssemblePackage(dataDir, outPath string, spec *config.BuildSpec, arch string) (string, error)
 }
 
 // Options sets configuration for constructing resolvers.
@@ -48,6 +53,7 @@ type Options struct {
 	CACerts        [][]byte
 	Timeout        time.Duration
 	OSVersion      string
+	Client         client.Client
 }
 
 // LockedPackage defines a single package record in lockfile.

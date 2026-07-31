@@ -8,24 +8,6 @@ import (
 	_ "github.com/broadsage/doko/internal/providers/apk"
 )
 
-func TestSanitizeBaseTag(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"alpine-3.23", "3.23"},
-		{"alpine-3.23-base", "3.23"},
-		{"custom-image", "custom-image"},
-	}
-
-	for _, tc := range tests {
-		result := sanitizeBaseTag(tc.input)
-		if result != tc.expected {
-			t.Errorf("sanitizeBaseTag(%q) = %q, want %q", tc.input, result, tc.expected)
-		}
-	}
-}
-
 func TestGenerate_WithPipelineAndKeyring(t *testing.T) {
 	spec := &config.Spec{
 		Name:     "test-generator",

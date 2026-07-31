@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/broadsage/doko/internal/utils"
 )
 
 // Spec defines the top-level schema of doko.yaml.
@@ -175,10 +177,11 @@ func Interpolate(data []byte) ([]byte, error) {
 		return data, nil
 	}
 	content := string(data)
+	subs := make(map[string]string)
 	for k, v := range temp.Vars {
-		placeholder := fmt.Sprintf("${%s}", k)
-		content = strings.ReplaceAll(content, placeholder, v)
+		subs[fmt.Sprintf("${%s}", k)] = v
 	}
+	content = utils.Substitute(content, subs)
 	return []byte(content), nil
 }
 

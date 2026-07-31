@@ -5,15 +5,17 @@ package apk
 
 import (
 	"bufio"
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"sync"
 
-	"github.com/broadsage/doko/internal/netutil"
+	"github.com/moby/buildkit/client/llb"
+	"github.com/moby/buildkit/frontend/gateway/client"
+
 	"github.com/broadsage/doko/internal/providers"
 )
 
@@ -32,14 +34,14 @@ func defaultRepos(version, arch string) []string {
 }
 
 func init() {
-	providers.RegisterResolver(providerName, newAPKResolver)
+	providers.RegisterResolver(providerName, PKGResolver)
 }
 
 // apkResolver resolves packages by parsing Alpine APKINDEX files.
 type apkResolver struct {
 	repos          []string
 	arch           string
-	httpClient     *http.Client
+	client         client.Client
 	lockedPackages map[string]string
 
 	indexOnce sync.Once
@@ -60,7 +62,24 @@ type apkEntry struct {
 	Checksum     string
 }
 
-func newAPKResolver(opts providers.Options) (providers.Resolver, error) {
+// SanitizeVersion extracts the stable major/minor Alpine version (e.g., "3.23" from "alpine-3.23.5-minimal").
+func SanitizeVersion(base string) string {
+	version := base
+	if remainder, cut := strings.CutPrefix(version, "alpine-"); cut {
+		version = remainder
+	}
+	for _, suffix := range []string{"-minimal", "-slim", "-base"} {
+		version = strings.TrimSuffix(version, suffix)
+	}
+	// Truncate Alpine point releases (e.g. 3.23.5 -> 3.23)
+	parts := strings.Split(version, ".")
+	if len(parts) > 2 {
+		version = parts[0] + "." + parts[1]
+	}
+	return version
+}
+
+func PKGResolver(opts providers.Options) (providers.Resolver, error) {
 	arch := opts.Arch
 	switch arch {
 	case "", "amd64":
@@ -69,7 +88,7 @@ func newAPKResolver(opts providers.Options) (providers.Resolver, error) {
 		arch = "aarch64"
 	}
 
-	version := opts.OSVersion
+	version := SanitizeVersion(opts.OSVersion)
 	if version == "" {
 		version = defaultAlpineVersion
 	}
@@ -82,17 +101,14 @@ func newAPKResolver(opts providers.Options) (providers.Resolver, error) {
 		repos = defaultRepos(version, arch)
 	}
 
-	var httpClient *http.Client
-	if len(opts.CACerts) > 0 {
-		httpClient = netutil.NewHTTPClientWithCAs(opts.CACerts, opts.Timeout)
-	} else {
-		httpClient = netutil.NewHTTPClient(opts.Timeout)
+	if opts.Client == nil {
+		return nil, fmt.Errorf("BuildKit gateway client is not initialized in resolver options")
 	}
 
 	return &apkResolver{
 		repos:          repos,
 		arch:           arch,
-		httpClient:     httpClient,
+		client:         opts.Client,
 		lockedPackages: opts.LockedPackages,
 	}, nil
 }
@@ -167,25 +183,32 @@ func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]provide
 func (r *apkResolver) fetchIndex(ctx context.Context, repoURL string) error {
 	indexURL := repoURL + "/APKINDEX.tar.gz"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, indexURL, nil)
+	st := llb.HTTP(indexURL, llb.Filename("APKINDEX.tar.gz"))
+	def, err := st.Marshal(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to create HTTP request for %s: %w", indexURL, err)
-	}
-	resp, err := r.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("HTTP request to %s failed: %w", indexURL, err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, indexURL)
+		return fmt.Errorf("failed to marshal APKINDEX HTTP state: %w", err)
 	}
 
-	// APKINDEX.tar.gz is a gzipped tarball. The index data is inside
-	// a file named "APKINDEX" within the tar. For simplicity and speed,
-	// we read the gzipped stream directly — the APKINDEX entries are the
-	// bulk of the content and appear after the tar header.
-	gz, err := gzip.NewReader(resp.Body)
+	res, err := r.client.Solve(ctx, client.SolveRequest{
+		Definition: def.ToPB(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to solve/download APKINDEX from %s: %w", indexURL, err)
+	}
+
+	ref, err := res.SingleRef()
+	if err != nil {
+		return fmt.Errorf("failed to get result reference for APKINDEX: %w", err)
+	}
+
+	data, err := ref.ReadFile(ctx, client.ReadRequest{
+		Filename: "APKINDEX.tar.gz",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to read APKINDEX archive: %w", err)
+	}
+
+	gz, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("gzip decompress failed: %w", err)
 	}

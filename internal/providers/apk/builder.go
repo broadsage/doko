@@ -1,12 +1,15 @@
 package apk
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	buildkitllb "github.com/moby/buildkit/client/llb"
 
+	"github.com/broadsage/doko/internal/config"
 	"github.com/broadsage/doko/internal/providers"
+	apkbuilder "github.com/broadsage/doko/internal/providers/apk/builder"
 )
 
 func init() {
@@ -18,7 +21,7 @@ type apkProvider struct{}
 
 func (p *apkProvider) Name() string { return "apk" }
 func (p *apkProvider) ResolveBaseImage(base string) string {
-	return fmt.Sprintf("alpine:%s", sanitizeBaseTag(base))
+	return fmt.Sprintf("alpine:%s", SanitizeVersion(base))
 }
 func (p *apkProvider) KeyringDest(filename string) string {
 	return "/etc/apk/keys/" + filename
@@ -47,14 +50,22 @@ func (p *apkProvider) CacheMounts() []buildkitllb.RunOption {
 func (p *apkProvider) RemovePaths() []string {
 	return []string{"/sbin/apk", "/lib/apk", "/var/cache/apk", "/etc/apk"}
 }
-
-func sanitizeBaseTag(base string) string {
-	if remainder, cut := strings.CutPrefix(base, "alpine-"); cut {
-		tag := remainder
-		for _, suffix := range []string{"-minimal", "-slim", "-base"} {
-			tag = strings.TrimSuffix(tag, suffix)
-		}
-		return tag
+func (p *apkProvider) BuildPackage(ctx context.Context, spec *config.BuildSpec, sourceState buildkitllb.State, resolver buildkitllb.ImageMetaResolver, opts ...buildkitllb.ConstraintsOpt) (buildkitllb.State, error) {
+	base := spec.Base
+	if base == "" {
+		base = "alpine-3.23"
 	}
-	return base
+	workerBaseImage := p.ResolveBaseImage(base)
+	return apkbuilder.BuildAPK(ctx, spec, sourceState, workerBaseImage, resolver, opts...)
+}
+func (p *apkProvider) AssemblePackage(dataDir, outPath string, spec *config.BuildSpec, arch string) (string, error) {
+	if err := apkbuilder.AssembleAPK(dataDir, outPath, spec, arch); err != nil {
+		return "", err
+	}
+	epoch := "0"
+	if spec.Epoch > 0 {
+		epoch = fmt.Sprintf("%d", spec.Epoch)
+	}
+	apkName := fmt.Sprintf("%s-%s-r%s.apk", strings.ToLower(spec.Name), spec.Version, epoch)
+	return apkName, nil
 }

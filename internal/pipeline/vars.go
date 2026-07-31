@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/broadsage/doko/internal/config"
+	"github.com/broadsage/doko/internal/utils"
 )
 
 // Substitution variable names (Melange-style). Use these in pipeline runs and in step with: values.
@@ -79,7 +80,7 @@ func (sm *SubstitutionMap) MutateWith(with map[string]string) (map[string]string
 	for i := 0; i < 32; i++ {
 		changed := false
 		for k, v := range nw {
-			replaced := Substitute(v, nw)
+			replaced := utils.Substitute(v, nw)
 			if replaced != v {
 				changed = true
 				nw[k] = replaced
@@ -96,9 +97,5 @@ func (sm *SubstitutionMap) MutateWith(with map[string]string) (map[string]string
 // Keys in m must include the ${{...}} form (e.g. "${{package.name}}").
 // Any remaining ${{...}} after substitution are left as-is (caller can strip them if needed).
 func Substitute(s string, m map[string]string) string {
-	out := s
-	for k, v := range m {
-		out = strings.ReplaceAll(out, k, v)
-	}
-	return out
+	return utils.Substitute(s, m)
 }

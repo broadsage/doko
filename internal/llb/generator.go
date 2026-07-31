@@ -16,7 +16,7 @@ import (
 
 	"github.com/broadsage/doko/internal/config"
 	"github.com/broadsage/doko/internal/providers"
-	"github.com/broadsage/doko/internal/providers/apk/builder"
+	"github.com/broadsage/doko/internal/utils"
 )
 
 type localAPK struct {
@@ -64,7 +64,15 @@ func (g *Generator) Generate(ctx context.Context) (*buildkitllb.Definition, erro
 			}
 			g.localAPKs[b.Name] = localAPK{filename: apkName, bytes: apkBytes}
 
-			builtState, err := builder.BuildAPK(ctx, &b, buildkitllb.Local("context"), nil)
+			pName := b.Provider
+			if pName == "" {
+				pName = g.Spec.Provider
+			}
+			pm, err := providers.GetBuilder(pName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get builder for %s: %w", pName, err)
+			}
+			builtState, err := pm.BuildPackage(ctx, &b, buildkitllb.Local("context"), nil)
 			if err != nil {
 				return nil, fmt.Errorf("failed to build stage for %s: %w", b.Name, err)
 			}
@@ -360,19 +368,6 @@ func (g *Generator) applyRuntime(state buildkitllb.State) buildkitllb.State {
 		state = state.AddEnv(key, val)
 	}
 	return state
-}
-
-// sanitizeBaseTag extracts a usable tag from the base field.
-// e.g. "alpine-3.23" -> "3.23".
-func sanitizeBaseTag(base string) string {
-	if remainder, cut := strings.CutPrefix(base, "alpine-"); cut {
-		tag := remainder
-		for _, suffix := range []string{"-minimal", "-slim", "-base"} {
-			tag = strings.TrimSuffix(tag, suffix)
-		}
-		return tag
-	}
-	return base
 }
 
 // resolveBaseImageFor maps a provider + base combo to a container image reference.
@@ -679,7 +674,15 @@ func (g *Generator) compilePackage(ctx context.Context, b config.BuildSpec) ([]b
 		return nil, "", fmt.Errorf("BuildKit gateway client is not initialized")
 	}
 
-	builtState, err := builder.BuildAPK(ctx, &b, buildkitllb.Local("context"), nil)
+	pName := b.Provider
+	if pName == "" {
+		pName = g.Spec.Provider
+	}
+	pm, err := providers.GetBuilder(pName)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get builder for %s: %w", pName, err)
+	}
+	builtState, err := pm.BuildPackage(ctx, &b, buildkitllb.Local("context"), nil)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to build compilation state: %w", err)
 	}
@@ -708,7 +711,7 @@ func (g *Generator) compilePackage(ctx context.Context, b config.BuildSpec) ([]b
 	defer os.RemoveAll(tmpDir)
 
 	const targetsOutDir = "/workspace/build-out"
-	if err := copyRefToDir(ctx, ref, targetsOutDir, tmpDir); err != nil {
+	if err := utils.CopyRefToDir(ctx, ref, targetsOutDir, tmpDir); err != nil {
 		return nil, "", fmt.Errorf("failed to copy output files from solved reference: %w", err)
 	}
 
@@ -722,7 +725,8 @@ func (g *Generator) compilePackage(ctx context.Context, b config.BuildSpec) ([]b
 	if arch == "" {
 		arch = "amd64"
 	}
-	if err := builder.AssembleAPK(dataDir, apkPath, &b, arch); err != nil {
+	apkName, err := pm.AssemblePackage(dataDir, apkPath, &b, arch)
+	if err != nil {
 		return nil, "", fmt.Errorf("failed to assemble APK: %w", err)
 	}
 
@@ -731,50 +735,5 @@ func (g *Generator) compilePackage(ctx context.Context, b config.BuildSpec) ([]b
 		return nil, "", fmt.Errorf("failed to read assembled APK file: %w", err)
 	}
 
-	epoch := "0"
-	if b.Epoch > 0 {
-		epoch = fmt.Sprintf("%d", b.Epoch)
-	}
-	apkName := fmt.Sprintf("%s-%s-r%s.apk", strings.ToLower(b.Name), b.Version, epoch)
-
 	return apkBytes, apkName, nil
-}
-
-func copyRefToDir(ctx context.Context, ref gwclient.Reference, refPath, destDir string) error {
-	entries, err := ref.ReadDir(ctx, gwclient.ReadDirRequest{Path: refPath})
-	if err != nil {
-		return err
-	}
-	for _, e := range entries {
-		name := e.Path
-		if name == "" || name == "." || name == ".." {
-			continue
-		}
-		srcPath := refPath + "/" + name
-		dstPath := filepath.Join(destDir, filepath.FromSlash(name))
-		if e.Mode&uint32(os.ModeDir) != 0 {
-			if err := os.MkdirAll(dstPath, 0o755); err != nil {
-				return err
-			}
-			if err := copyRefToDir(ctx, ref, srcPath, dstPath); err != nil {
-				return err
-			}
-			continue
-		}
-		data, err := ref.ReadFile(ctx, gwclient.ReadRequest{Filename: srcPath})
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
-			return err
-		}
-		mode := e.Mode & uint32(os.ModePerm)
-		if mode == 0 {
-			mode = 0o644
-		}
-		if err := os.WriteFile(dstPath, data, os.FileMode(mode)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
