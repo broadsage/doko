@@ -1,43 +1,64 @@
 # Doko — Declarative OCI Kit Orchestrator
 
-> Declarative, hardened OCI container images — without writing a single Dockerfile.
->
-> *"Where is my container configured?" -> doko (In the simple YAML spec).*
+<p align="center">
+  <img src="https://raw.githubusercontent.com/broadsage/doko/main/docs/assets/logo.png" alt="Doko Logo" width="120" style="border-radius: 20%;" onerror="this.style.display='none'"/>
+</p>
 
-[![Build](https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/build.yml)
-[![Verify](https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/verify.yml)
-[![Test Examples](https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg)](https://github.com/broadsage/doko/actions/workflows/test-examples.yml)
-[![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE)
-[![Go version](https://img.shields.io/github/go-mod/go-version/broadsage/doko)](go.mod)
-[![Latest Release](https://img.shields.io/github/v/release/broadsage/doko?label=Release)](https://github.com/broadsage/doko/releases/latest)
+<h3 align="center">Doko</h3>
 
-**Doko** is an open-source [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` spec into a minimal, hardened, policy-compliant OCI container image — all from a single declarative file.
+<p align="center">
+  <strong>Declarative, hardened OCI container images — without writing a single Dockerfile.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/broadsage/doko/actions/workflows/build.yml"><img src="https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg" alt="Build"/></a>
+  <a href="https://github.com/broadsage/doko/actions/workflows/verify.yml"><img src="https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg" alt="Verify"/></a>
+  <a href="https://github.com/broadsage/doko/actions/workflows/test-examples.yml"><img src="https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg" alt="Test Examples"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"/></a>
+  <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/broadsage/doko" alt="Go version"/></a>
+  <a href="https://github.com/broadsage/doko/releases/latest"><img src="https://img.shields.io/github/v/release/broadsage/doko?label=Release" alt="Latest Release"/></a>
+</p>
 
 ---
+
+**Doko** is an open-source, next-generation [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` specification directly into a minimal, hardened, policy-compliant OCI container image. 
+
+No more boilerplate Dockerfiles, complex multi-stage shell scripts, or post-build vulnerability scanning workarounds.
+
+```mermaid
+graph LR
+    spec[doko.yaml Spec] --> compiler[Doko BuildKit Frontend]
+    compiler --> llb[BuildKit LLB Translation]
+    llb --> image[Hardened OCI Image]
+    
+    style spec fill:#f9f,stroke:#333,stroke-width:2px
+    style compiler fill:#bbf,stroke:#333,stroke-width:2px
+    style image fill:#bfb,stroke:#333,stroke-width:2px
+```
 
 ## Table of Contents
 
 - [Why Doko?](#why-doko)
 - [Quick Start](#quick-start)
 - [Key Features](#key-features)
-- [Documentation](#documentation)
 - [Project Structure](#project-structure)
-- [Development](#development)
-- [Security](#security)
-- [License](#license)
+- [Development & Contributing](#development--contributing)
+- [Security & License](#security--license)
 
 ---
 
 ## Why Doko?
 
-Traditional Dockerfiles are imperative, error-prone, and difficult to audit. Existing alternatives each have significant limitations:
+Traditional Dockerfiles are imperative, prone to security misconfigurations, and difficult to audit. Doko brings declarative clarity to OCI image composition:
 
-| Feature | Docker DHI | Chainguard (apko) | **Doko** |
-| :--- | :--- | :--- | :--- |
-| Target OS | Alpine, Debian | Wolfi/Alpine only | **Alpine** |
-| Multi-Stage Builds | Yes | No | **Yes (with `outputs:`)** |
-| Negative Packages | Yes (`!pkg`) | No | **Yes (`!pkg`)** |
-| Open Source | Partial | Yes | **100% Open Source** |
+| Feature | Dockerfiles | Chainguard (apko) | **Doko** |
+| :--- | :---: | :---: | :---: |
+| **Declarative Spec** | ❌ (Imperative) | ✅ | **✅ Yes** |
+| **Target OS** | Alpine, Debian, etc. | Wolfi / Alpine | **Alpine** |
+| **Multi-Stage Builds** | ✅ | ❌ | **✅ Yes (via `outputs:`)** |
+| **Negative Packages** | ❌ | ❌ | **✅ Yes (`!pkg` removal)** |
+| **Custom Compilations**| ❌ | ❌ | **✅ Yes (native pipeline templates)** |
+| **Open Source** | ✅ | ✅ | **✅ 100% Apache-2.0** |
 
 ---
 
@@ -84,24 +105,22 @@ runtime:
 
 ### 2. Build with Docker Buildx
 
+Run the build command from your terminal:
+
 ```bash
 docker buildx build -f doko.yaml --tag my-secure-app:latest --load .
 ```
-
-No Dockerfile. No shell scripts. No post-build scanning.
 
 ---
 
 ## Key Features
 
-**Declarative YAML Syntax**
-Define packages, directories, users, ports, and entrypoint in a single auditable file. Every security decision is visible and reviewable in version control.
+### 🛡️ Default Secure-by-Design
+> [!IMPORTANT]
+> By default, setting `accounts.root: false` completely purges the root user and group from `/etc/passwd` and `/etc/group`, eliminating UID 0 privilege escalation attacks entirely.
 
-**APK Package Provider**
-Use `apk` for Alpine.
-
-**Negative Package Removal**
-Prefix any package with `!` to strip it from the base image:
+### 📦 Negative Package Trimming
+Remove dangerous or unneeded system packages from base environments explicitly:
 ```yaml
 contents:
   packages:
@@ -110,8 +129,8 @@ contents:
     - "!gawk"
 ```
 
-**Multi-Stage Sub-Builds**
-Compile artifacts in an isolated build stage and copy them into the final image declaratively:
+### 🔀 Multi-Stage Sub-Builds
+Compile artifacts in isolated builder stages and transfer outputs cleanly:
 ```yaml
 builds:
   - name: app-builder
@@ -126,8 +145,8 @@ builds:
           runs: go build -o /usr/local/bin/app ./cmd/app
 ```
 
-**Custom Package Compilation Pipelines**
-Build packages from source using reusable pipeline templates (e.g. `fetch`, `configure`, `make`, `install`) and inject the resulting `.apk` files directly into the final image:
+### ⚙️ Custom Package Compilation
+Build specialized packages using reusable steps/templates (`fetch`, `configure`, `make`, `install`) directly inside your image pipeline:
 ```yaml
 builds:
   - name: my-custom-pkg
@@ -142,8 +161,8 @@ builds:
       - uses: install
 ```
 
-**External OCI Artifact Imports**
-Pull individual files from any OCI image without defining a full build stage:
+### 🌐 OCI-Native Layout & Import
+Pull files directly from external OCI images without configuring secondary stages:
 ```yaml
 artifacts:
   - name: ghcr.io/your-org/gosu:1.17
@@ -151,75 +170,47 @@ artifacts:
       - /usr/local/bin/gosu
 ```
 
-**Root Purging**
-`accounts.root: false` (the default) removes root entirely from `/etc/passwd` and `/etc/group`, eliminating UID 0 privilege escalation.
-
-**OCI-Native Layout**
-All annotations follow the [OCI Image Spec](https://github.com/opencontainers/image-spec/blob/main/annotations.md).
-
----
-
-## Documentation
-
-| Document | Description |
-|---|---|
-| [Schema Reference](docs/schema.md) | Complete reference for all `doko.yaml` fields, types, and examples |
-| [Release Process](docs/release.md) | Automated and manual release workflow, versioning, and GoReleaser |
-| [Contributing](CONTRIBUTING.md) | Dev environment setup, testing, linting, and PR guidelines |
-| [Examples](examples/) | Ready-to-use `doko.yaml` configs for Nginx, PostgreSQL, Redis, and Python API |
-
 ---
 
 ## Project Structure
 
 ```
-cmd/doko/           — BuildKit frontend entrypoint
-docs/               — Project documentation
-examples/           — Example doko.yaml configs with integration tests
-hack/               — Developer tooling scripts
+cmd/doko/           — BuildKit frontend entrypoint CLI
+docs/               — Schema guidelines and release documentation
+examples/           — Reference builds (Nginx, PostgreSQL, Redis, Python API)
+hack/               — Developer scripts (make-dev.sh, make-image.sh)
 internal/
-  builder/          — BuildKit frontend gateway builder orchestrator
-  config/           — doko.yaml schema, types, and validation
-  llb/              — BuildKit LLB translation engine
-  pipeline/         — Reusable pipeline template engine (vars, steps)
-  providers/        — Unified provider registry (resolvers + builders)
-    apk/            — Alpine APKINDEX resolver and LLB builder
-      builder/      — APK package compilation engine and pipeline templates
-  utils/            — Unified utility helpers (strings, BuildKit)
+  builder/          — BuildKit client session gateway orchestrator
+  config/           — YAML parsing, schema definition, and validation
+  llb/              — BuildKit Low-Level Builder (LLB) generation
+  pipeline/         — Reusable build pipeline and variable template engine
+  providers/        — Unified provider registry (Apk builders & resolvers)
+  utils/            — Common helpers (strings, BuildKit integration)
 ```
 
 ---
 
-## Development
+## Development & Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions. Quick reference using Taskfile:
+We welcome community contributions. Detailed workflow information is available in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+### Quick Reference (using Taskfile)
 
 ```bash
-# Bootstrap containerised development environment
+# Spin up the containerised development workspace
 task devenv
 
-# Build, test, and lint locally
-task generate                       # regenerate schema.json when structs change
-task build
-task test
-task lint
-
-# Run end-to-end test against nginx example
-task test-example pkg=nginx
-
-# GoReleaser snapshot build
-goreleaser build --snapshot --clean
+# Common Tasks
+task generate         # Regenerate schema.json from Go structs
+task build            # Compile local binary
+task test             # Run test suite
+task lint             # Verify code quality via golangci-lint
+task test-example     # Run end-to-end spec compilation tests
 ```
 
 ---
 
-## Security
+## Security & License
 
-Doko is a security-focused project. If you discover a vulnerability, please **do not open a public issue**. Report it privately via [GitHub Security Advisories](https://github.com/broadsage/doko/security/advisories/new).
-
----
-
-## License
-
-By contributing to Doko, you agree that your contributions will be licensed under the [Apache-2.0 License](LICENSE).
-
+* **Security Vulnerabilities**: If you find a security issue, please report it privately via [GitHub Security Advisories](https://github.com/broadsage/doko/security/advisories/new) instead of opening public issues.
+* **License**: This project is licensed under the Apache-2.0 License. See the [LICENSE](LICENSE) file for details.
