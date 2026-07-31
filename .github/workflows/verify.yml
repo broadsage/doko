@@ -60,10 +60,9 @@ jobs:
           check-latest: true
 
       - name: Install Task
-        uses: arduino/setup-task@b9e59d47aabcb583f744e73b22cf3c9593457a15 # v2.0.0
+        uses: go-task/setup-task@v2
         with:
           version: 3.x
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run tests
         run: task test
