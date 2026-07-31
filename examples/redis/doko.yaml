@@ -48,7 +48,8 @@ contents:
 
 work-dir: /data
 
+entrypoint: ["redis-server", "--protected-mode", "no"]
+
 runtime:
   ports:
     - 6379
-  entrypoint: ["redis-server", "--protected-mode", "no"]

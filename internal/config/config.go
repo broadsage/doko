@@ -1,13 +1,19 @@
 // Package config handles the parsing, validation, and structures of the doko.yaml spec file.
 package config
 
+//go:generate go run github.com/broadsage/doko/cmd/gen-schema
+
 import (
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	jsonschema "github.com/google/jsonschema-go/jsonschema"
 
 	"github.com/broadsage/doko/internal/utils"
 )
@@ -25,9 +31,9 @@ type Spec struct {
 	Provider       string            `yaml:"-"         json:"provider,omitempty"`
 	Base           string            `yaml:"-"         json:"base,omitempty"`
 	Arch           string            `yaml:"arch"      json:"arch,omitempty"` // amd64, arm64 — defaults to amd64
-	Contents       ContentsConfig    `yaml:"contents"  json:"contents"`
+	Contents       ContentsConfig    `yaml:"contents,omitempty"  json:"contents,omitempty"`
 	Builds         []BuildSpec       `yaml:"builds"    json:"builds,omitempty"`
-	Runtime        RuntimeConfig     `yaml:"runtime"   json:"runtime"`
+	Runtime        RuntimeConfig     `yaml:"runtime,omitempty"   json:"runtime,omitempty"`
 	Accounts       AccountsConfig    `yaml:"accounts"  json:"accounts,omitempty"`
 	Environment    map[string]string `yaml:"environment" json:"environment,omitempty"`
 	Annotations    map[string]string `yaml:"annotations" json:"annotations,omitempty"`
@@ -185,6 +191,40 @@ func Interpolate(data []byte) ([]byte, error) {
 	return []byte(content), nil
 }
 
+//go:embed schema.json
+var schemaData []byte
+
+// validateConfig validates the YAML configuration bytes against the embedded JSON Schema.
+func validateConfig(data []byte) error {
+	var parsedConfig any
+	if err := yaml.Unmarshal(data, &parsedConfig); err != nil {
+		return fmt.Errorf("failed to parse config YAML: %w", err)
+	}
+	if parsedConfig == nil {
+		return nil
+	}
+	jsonBytes, err := json.Marshal(parsedConfig)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config to JSON: %w", err)
+	}
+	var jsonParsed any
+	if err := json.Unmarshal(jsonBytes, &jsonParsed); err != nil {
+		return fmt.Errorf("failed to parse config JSON: %w", err)
+	}
+	var schema jsonschema.Schema
+	if err := json.Unmarshal(schemaData, &schema); err != nil {
+		return fmt.Errorf("failed to unmarshal JSON Schema: %w", err)
+	}
+	resolved, err := schema.Resolve(nil)
+	if err != nil {
+		return fmt.Errorf("failed to resolve JSON Schema: %w", err)
+	}
+	if err := resolved.Validate(jsonParsed); err != nil {
+		return fmt.Errorf("config schema validation failed: %w", err)
+	}
+	return nil
+}
+
 // Parse reads a LayerKit YAML configuration from a reader.
 func Parse(r io.Reader) (*Spec, error) {
 	data, err := io.ReadAll(r)
@@ -194,6 +234,9 @@ func Parse(r io.Reader) (*Spec, error) {
 	interpolated, err := Interpolate(data)
 	if err == nil {
 		data = interpolated
+	}
+	if err := validateConfig(data); err != nil {
+		return nil, err
 	}
 	var spec Spec
 	if err := yaml.Unmarshal(data, &spec); err != nil {

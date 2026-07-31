@@ -178,13 +178,14 @@ docs/               — Project documentation
 examples/           — Example doko.yaml configs with integration tests
 hack/               — Developer tooling scripts
 internal/
+  builder/          — BuildKit frontend gateway builder orchestrator
   config/           — doko.yaml schema, types, and validation
   llb/              — BuildKit LLB translation engine
-  netutil/          — Shared HTTP client utilities
   pipeline/         — Reusable pipeline template engine (vars, steps)
   providers/        — Unified provider registry (resolvers + builders)
     apk/            — Alpine APKINDEX resolver and LLB builder
       builder/      — APK package compilation engine and pipeline templates
+  utils/            — Unified utility helpers (strings, BuildKit)
 ```
 
 ---
@@ -202,6 +203,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full setup instructions. Quick refere
 ./hack/make-dokoenv.sh test nginx   # end-to-end test against nginx example
 
 # Build, test, and lint locally
+go generate ./...                   # regenerate schema.json when structs change
 go build -o ./doko ./cmd/doko/
 go test ./... -race -count=1
 golangci-lint run ./...

@@ -62,9 +62,10 @@ stop-signal: SIGINT
 
 work-dir: /var/lib/postgresql
 
+entrypoint: ["postgres"]
+
 runtime:
   ports:
     - 5432
   env:
     PGDATA: "${PGDATA}"
-  entrypoint: ["postgres"]

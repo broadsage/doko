@@ -1,8 +1,11 @@
 package config
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/google/jsonschema-go/jsonschema"
 )
 
 func TestParse_ValidConfig(t *testing.T) {
@@ -58,8 +61,8 @@ contents:
 	if err == nil {
 		t.Fatal("expected validation error for missing name, got nil")
 	}
-	if !strings.Contains(err.Error(), "name is required") {
-		t.Errorf("expected 'name is required' in error, got: %v", err)
+	if !strings.Contains(err.Error(), "name") {
+		t.Errorf("expected 'name' in validation error, got: %v", err)
 	}
 }
 
@@ -106,5 +109,44 @@ builds:
 
 	if len(spec.Builds) != 1 || !spec.Builds[0].Privileged {
 		t.Errorf("expected Builds[0].Privileged to be true")
+	}
+}
+
+func TestParse_SchemaValidationFailure(t *testing.T) {
+	// yamlInput with a typo field ("non-existent-field") and wrong type for entrypoint (must be array, here it is string)
+	yamlInput := `
+name: bad-config
+provider: apk
+non-existent-field: hello
+entrypoint: "nginx -g daemon off;"
+`
+	_, err := Parse(strings.NewReader(yamlInput))
+	if err == nil {
+		t.Fatal("expected schema validation error, got nil")
+	}
+	if !strings.Contains(err.Error(), "schema validation failed") {
+		t.Errorf("expected schema validation failure message, got: %v", err)
+	}
+}
+
+func TestSchemaIsUpToDate(t *testing.T) {
+	// 1. Generate schema dynamically from current config.Spec struct via reflection
+	generatedSchema, err := jsonschema.For[Spec](nil)
+	if err != nil {
+		t.Fatalf("failed to generate schema: %v", err)
+	}
+	generatedSchema.Schema = "http://json-schema.org/draft-07/schema#"
+
+	generatedBytes, err := json.MarshalIndent(generatedSchema, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal generated schema: %v", err)
+	}
+
+	// 2. Compare against embedded schemaData
+	cleanGenerated := strings.TrimSpace(string(generatedBytes))
+	cleanEmbedded := strings.TrimSpace(string(schemaData))
+
+	if cleanGenerated != cleanEmbedded {
+		t.Errorf("schema.json is out of date! Please run: go generate ./...")
 	}
 }

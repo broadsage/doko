@@ -77,14 +77,19 @@ CGO_ENABLED=0 go build \
   -o doko ./cmd/doko/
 ```
 
-### Test
+### Test & Code Generation
+
+If you modify Go structs representing the configuration schema (like `config.Spec`), you must regenerate `schema.json` using `go generate`:
 
 ```bash
+# Regenerate schema.json
+go generate ./...
+
 # Run all tests
 go test ./... -race -count=1
 
 # Run a specific package
-go test ./internal/vulnerability/... -v
+go test ./internal/config/... -v
 
 # Run example config tests
 go test ./examples/... -v -count=1
@@ -218,18 +223,14 @@ All PRs must pass the following CI checks before merging:
 ```
 cmd/doko/          — BuildKit frontend entrypoint and version info
 internal/
+  builder/         — BuildKit frontend gateway builder orchestrator
   config/          — doko.yaml schema, types, and parsing
   llb/             — BuildKit LLB translation engine
-  netutil/         — Shared HTTP client utilities
   pipeline/        — Reusable pipeline template engine (vars, steps)
-  policy/          — Compile-time CVE and license policy gates
-  provenance/      — SLSA provenance attestation generation
   providers/       — Unified provider registry (resolvers + builders)
     apk/           — Alpine APKINDEX resolver and LLB builder
       builder/     — APK package compilation engine and pipeline templates
-  sbom/            — CycloneDX and SPDX SBOM generation
-  security/        — Seccomp and Landlock profile generators
-  vulnerability/   — OSV.dev CVE scanner and VEX matcher
+  utils/           — Unified utility helpers (strings, BuildKit)
 docs/              — Project documentation
 examples/          — Example doko.yaml configs with integration tests
 hack/              — Developer tooling scripts

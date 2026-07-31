@@ -1,0 +1,651 @@
+{
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "image": {
+      "type": "string"
+    },
+    "variant": {
+      "type": "string"
+    },
+    "tags": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "platforms": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "dates": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "vars": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "provider": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string"
+    },
+    "arch": {
+      "type": "string"
+    },
+    "contents": {
+      "type": "object",
+      "properties": {
+        "packages": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "repositories": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "keyring": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "paths": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              },
+              "uid": {
+                "type": "integer"
+              },
+              "gid": {
+                "type": "integer"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "path"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "pipeline": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "runs": {
+                "type": "string"
+              },
+              "uses": {
+                "type": "string"
+              },
+              "with": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "ssh": {
+                "type": "boolean"
+              },
+              "secrets": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "target"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "network": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "ca-certificates": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "packages"
+      ],
+      "additionalProperties": false
+    },
+    "builds": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "epoch": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "base": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "work-dir": {
+            "type": "string"
+          },
+          "source-dir": {
+            "type": "string"
+          },
+          "privileged": {
+            "type": "boolean"
+          },
+          "contents": {
+            "type": "object",
+            "properties": {
+              "packages": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "repositories": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "keyring": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "paths": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "uid": {
+                      "type": "integer"
+                    },
+                    "gid": {
+                      "type": "integer"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pipeline": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "runs": {
+                      "type": "string"
+                    },
+                    "uses": {
+                      "type": "string"
+                    },
+                    "with": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "ssh": {
+                      "type": "boolean"
+                    },
+                    "secrets": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "target"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "network": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "ca-certificates": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "packages"
+            ],
+            "additionalProperties": false
+          },
+          "outputs": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                },
+                "uid": {
+                  "type": "integer"
+                },
+                "gid": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "source",
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "pipeline": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "runs": {
+                  "type": "string"
+                },
+                "uses": {
+                  "type": "string"
+                },
+                "with": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "ssh": {
+                  "type": "boolean"
+                },
+                "secrets": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "target": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "network": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "ports": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "integer"
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "accounts": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "type": "boolean"
+        },
+        "run-as": {
+          "type": "string"
+        },
+        "users": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "uid": {
+                "type": "integer"
+              },
+              "gid": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "uid",
+              "gid"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "groups": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "gid": {
+                "type": "integer"
+              },
+              "members": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "gid"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "os-release": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "version-id": {
+          "type": "string"
+        },
+        "version-codename": {
+          "type": "string"
+        },
+        "pretty-name": {
+          "type": "string"
+        },
+        "home-url": {
+          "type": "string"
+        },
+        "bug-report-url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stop-signal": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "includes": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "uid": {
+            "type": "integer"
+          },
+          "gid": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "includes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "work-dir": {
+      "type": "string"
+    },
+    "entrypoint": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "cmd": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "timeout-seconds": {
+      "type": "integer"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "required": [
+    "name"
+  ],
+  "additionalProperties": false
+}
