@@ -32,17 +32,71 @@ tasks:
     cmds:
       - golangci-lint run ./...
 
-  devenv:
-    desc: Bootstrap containerised development environment
+  check:
+    desc: Verify all required development tools are installed
+    silent: true
     cmds:
-      - ./hack/make-devenv.sh
+      - |
+        missing=0
+        echo "Checking required tools..."
+        for tool in go docker golangci-lint; do
+          if command -v "$tool" &>/dev/null; then
+            ver=$("$tool" version 2>/dev/null | head -1 || echo "unknown")
+            echo "  ✓ $tool: $ver"
+          else
+            echo "  ✗ $tool: not found" >&2
+            missing=1
+          fi
+        done
+        if docker buildx version &>/dev/null 2>&1; then
+          echo "  ✓ docker buildx: $(docker buildx version 2>/dev/null | head -1)"
+        else
+          echo "  ✗ docker buildx: not found" >&2
+          missing=1
+        fi
+        echo ""
+        echo "Optional tools (releases only):"
+        for tool in goreleaser cosign; do
+          if command -v "$tool" &>/dev/null; then
+            ver=$("$tool" version 2>/dev/null | head -1 || echo "unknown")
+            echo "  ✓ $tool: $ver"
+          else
+            echo "  - $tool: not found (install only if cutting releases)"
+          fi
+        done
+        if [ "$missing" -ne 0 ]; then
+          echo ""
+          echo "ERROR: Missing required tools. Install them:" >&2
+          echo "  go:            https://go.dev/dl/" >&2
+          echo "  docker:        https://docs.docker.com/engine/install/" >&2
+          echo "  golangci-lint: https://golangci-lint.run/usage/install/" >&2
+          echo "  docker buildx: https://docs.docker.com/build/install-buildx/" >&2
+          exit 1
+        fi
+        echo ""
+        echo "All required tools are available."
+
+  image:
+    desc: Build the doko:local frontend image from root Dockerfile
+    cmds:
+      - ./hack/make-image.sh build
+
+  devenv:
+    desc: Launch interactive dev container
+    cmds:
+      - ./hack/make-dev.sh
+
+  devenv:rebuild:
+    desc: Force rebuild the dev container image
+    cmds:
+      - ./hack/make-dev.sh rebuild
 
   test-example:
-    desc: Run end-to-end test against an example (e.g. task test-example pkg=nginx)
+    desc: Run end-to-end test against an example (e.g. task test-example pkg=redis)
     cmds:
-      - ./hack/make-dokoenv.sh test {{.pkg}}
+      - ./hack/make-image.sh test {{.pkg}}
     vars:
-      pkg: ""
+      pkg: nginx
 
   clean:
     desc: Remove local binaries and build files

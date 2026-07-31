@@ -23,7 +23,7 @@ Before contributing code, make sure you have the following tools installed:
 Verify your setup at any time:
 
 ```bash
-./hack/make-devenv.sh check
+task check
 ```
 
 ---
@@ -103,18 +103,18 @@ task lint
 
 ### Build and test the doko frontend image locally
 
-The `make-devenv.sh` commands work on the Go source. To build the actual doko
-OCI frontend image and run it against an example spec, use `make-dokoenv.sh`:
+The `task build` command works on the Go source. To build the actual doko
+OCI frontend image and run it against an example spec:
 
 ```bash
 # Build the doko:local image from the root Dockerfile
-./hack/make-dokoenv.sh build
+task image
 
 # End-to-end test against an example (nginx by default)
-./hack/make-dokoenv.sh test
+task test-example
 
 # Test a specific example (nginx / redis / postgres / python-api)
-./hack/make-dokoenv.sh test redis
+task test-example pkg=redis
 ```
 
 The `test` command patches the `# syntax=` line in the example's `doko.yaml` to

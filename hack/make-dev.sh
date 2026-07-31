@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# hack/make-devenv.sh — Bootstrap a consistent doko development environment.
+# hack/make-dev.sh — Bootstrap a consistent doko development environment.
+#
+# This script manages the Docker-based dev container. For day-to-day
+# build/test/lint commands, use the Taskfile directly (e.g. `task build`).
 #
 # Usage:
-#   ./hack/make-devenv.sh             # Launch interactive dev container (default)
-#   ./hack/make-devenv.sh check       # Verify all required local tools are installed
-#   ./hack/make-devenv.sh build       # Build the doko binary inside Docker
-#   ./hack/make-devenv.sh test        # Run the full test suite inside Docker
-#   ./hack/make-devenv.sh lint        # Run golangci-lint inside Docker
-#   ./hack/make-devenv.sh rebuild     # Force rebuild the dev container image
-#   ./hack/make-devenv.sh help        # Show this help message
+#   ./hack/make-dev.sh             # Launch interactive dev container (default)
+#   ./hack/make-dev.sh rebuild     # Force rebuild the dev container image
+#   ./hack/make-dev.sh help        # Show this help message
 
 set -euo pipefail
 
@@ -29,7 +28,6 @@ readonly GORELEASER_VERSION="v2.9.0"
 readonly BUILDX_VERSION="v0.23.0"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
-# Defined before arch detection so log_error is available in the case block.
 
 log_info()  { echo "[doko-devenv] $*"; }
 log_error() { echo "[doko-devenv] ERROR: $*" >&2; }
@@ -51,50 +49,6 @@ check_repo() {
         || die "go.mod not found — run from the doko repository root."
     grep -q "^module ${REPO_MODULE}$" "${REPO_ROOT}/go.mod" \
         || die "Not in the doko repository. Expected module: ${REPO_MODULE}"
-}
-
-
-check_tools() {
-    # Required for build, test, lint
-    local required_tools=(docker go golangci-lint)
-    # Only needed for cutting releases
-    local optional_tools=(goreleaser cosign)
-
-    log_info "Required tools:"
-    local -i missing=0
-    for tool in "${required_tools[@]}"; do
-        if command -v "${tool}" &>/dev/null; then
-            local ver
-            ver="$("${tool}" version 2>/dev/null | head -1 || echo "unknown")"
-            log_info "  ✓ ${tool}: ${ver}"
-        else
-            log_error "  ✗ ${tool}: not found"
-            missing=1
-        fi
-    done
-
-    echo
-    log_info "Optional tools (needed for releases only):"
-    for tool in "${optional_tools[@]}"; do
-        if command -v "${tool}" &>/dev/null; then
-            local ver
-            ver="$("${tool}" version 2>/dev/null | head -1 || echo "unknown")"
-            log_info "  ✓ ${tool}: ${ver}"
-        else
-            log_info "  - ${tool}: not found (install only if cutting releases)"
-        fi
-    done
-
-    if [[ "${missing}" -ne 0 ]]; then
-        echo
-        log_error "Missing required tools. Install them:"
-        log_info "  go:            https://go.dev/dl/"
-        log_info "  docker:        https://docs.docker.com/engine/install/"
-        log_info "  golangci-lint: https://golangci-lint.run/usage/install/ (version ${GOLANGCI_LINT_VERSION})"
-        exit 1
-    fi
-
-    log_info "All required tools are available."
 }
 
 
@@ -126,19 +80,6 @@ ensure_image() {
 }
 
 
-# Run a command inside the dev container with the repo mounted.
-run_in_devenv() {
-    ensure_image
-    docker run --rm \
-        --platform "linux/${ARCH}" \
-        --workdir /workspace \
-        --volume "${REPO_ROOT}:/workspace" \
-        --volume "/var/run/docker.sock:/var/run/docker.sock" \
-        "$(image_tag)" \
-        "$@"
-}
-
-
 cmd_run() {
     ensure_image
     log_info "Starting interactive dev environment (type 'exit' to leave)..."
@@ -155,24 +96,6 @@ cmd_run() {
         /bin/bash -i
 }
 
-cmd_build() {
-    log_info "Building doko binary (linux/${ARCH})..."
-    run_in_devenv go build -o ./doko ./cmd/doko/
-    log_info "Binary built: ./doko"
-}
-
-cmd_test() {
-    log_info "Running tests..."
-    run_in_devenv go test ./... -race -count=1
-    log_info "All tests passed."
-}
-
-cmd_lint() {
-    log_info "Running golangci-lint..."
-    run_in_devenv golangci-lint run ./...
-    log_info "Lint passed."
-}
-
 cmd_rebuild() {
     log_info "Force rebuilding dev container image..."
     build_devenv_image
@@ -180,16 +103,18 @@ cmd_rebuild() {
 
 usage() {
     cat <<EOF
-Usage: ./hack/make-devenv.sh [command]
+Usage: ./hack/make-dev.sh [command]
 
 Commands:
   (none)    Launch an interactive dev container (default)
-  check     Verify all required local tools are installed
-  build     Build the doko binary inside Docker
-  test      Run the full test suite inside Docker
-  lint      Run golangci-lint inside Docker
   rebuild   Force rebuild the dev container image
   help      Show this message
+
+For build, test, lint, and tool checks use the Taskfile:
+  task build          Compile the doko binary locally
+  task test           Run the Go test suite
+  task lint           Run golangci-lint
+  task check          Verify all required tools
 
 Environment:
   Go version:         ${GO_VERSION} (from go.mod)
@@ -204,12 +129,8 @@ EOF
 check_repo
 
 case "${1:-}" in
-    "")                cmd_run     ;;
-    "check")           check_tools ;;
-    "build")           cmd_build   ;;
-    "test")            cmd_test    ;;
-    "lint")            cmd_lint    ;;
-    "rebuild")         cmd_rebuild ;;
-    "help"|"--help"|"-h") usage   ;;
+    "")                   cmd_run     ;;
+    "rebuild")            cmd_rebuild ;;
+    "help"|"--help"|"-h") usage      ;;
     *) log_error "Unknown command: $1"; echo; usage; exit 1 ;;
 esac

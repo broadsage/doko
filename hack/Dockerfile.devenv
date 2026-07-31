@@ -1,5 +1,5 @@
 # hack/Dockerfile.devenv — Development environment for doko.
-# Built and used by hack/make-devenv.sh.
+# Built and used by hack/make-dev.sh.
 #
 # Tools included:
 #   - Go (version from go.mod)

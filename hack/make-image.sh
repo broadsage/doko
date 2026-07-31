@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
-# hack/make-dokoenv.sh — Build and locally test the doko BuildKit frontend image.
+# hack/make-image.sh — Build and locally test the doko BuildKit frontend image.
 #
 # All commands run directly on the host (no dev container involved).
 # Requires: docker, docker buildx
 #
 # Usage:
-#   ./hack/make-dokoenv.sh             # Show help (default)
-#   ./hack/make-dokoenv.sh check       # Verify docker + buildx are available
-#   ./hack/make-dokoenv.sh build       # Build doko:local from the root Dockerfile
-#   ./hack/make-dokoenv.sh test        # End-to-end test: nginx example → local image
-#   ./hack/make-dokoenv.sh test redis  # End-to-end test: redis example → local image
-#   ./hack/make-dokoenv.sh help        # Show this help message
+#   ./hack/make-image.sh build       # Build doko:local from the root Dockerfile
+#   ./hack/make-image.sh test        # End-to-end test: nginx example → local image
+#   ./hack/make-image.sh test redis  # End-to-end test: redis example → local image
+#   ./hack/make-image.sh help        # Show this help message
 
 set -euo pipefail
 
@@ -39,41 +37,6 @@ check_repo() {
     [[ -f "${REPO_ROOT}/go.mod" ]] \
         || die "go.mod not found — run from the doko repository root."
 }
-
-check_tools() {
-    local -i missing=0
-
-    log_info "Checking required tools:"
-    for tool in docker; do
-        if command -v "${tool}" &>/dev/null; then
-            local ver
-            ver="$("${tool}" --version 2>/dev/null | head -1 || echo "unknown")"
-            log_info "  ✓ ${tool}: ${ver}"
-        else
-            log_error "  ✗ ${tool}: not found"
-            missing=1
-        fi
-    done
-
-    # docker buildx can be a plugin (docker buildx) or a standalone binary
-    if docker buildx version &>/dev/null 2>&1; then
-        local bx_ver
-        bx_ver="$(docker buildx version 2>/dev/null | head -1 || echo "unknown")"
-        log_info "  ✓ docker buildx: ${bx_ver}"
-    else
-        log_error "  ✗ docker buildx: not found"
-        log_error "    Install: https://docs.docker.com/build/install-buildx/"
-        missing=1
-    fi
-
-    if [[ "${missing}" -ne 0 ]]; then
-        echo
-        die "Missing required tools. Install them and retry."
-    fi
-
-    log_info "All required tools are available."
-}
-
 
 # Build the doko BuildKit frontend image from the root Dockerfile.
 # Tags it as doko:local for use in demo builds and local testing.
@@ -143,11 +106,9 @@ cmd_test() {
 
 usage() {
     cat <<EOF
-Usage: ./hack/make-dokoenv.sh [command] [args]
+Usage: ./hack/make-image.sh [command] [args]
 
 Commands:
-  (none)        Show this help (default)
-  check         Verify docker and docker buildx are available
   build         Build doko:local from the root Dockerfile
   test          End-to-end test using the nginx example (default)
   test <name>   End-to-end test using a specific example
@@ -161,6 +122,9 @@ How it works:
   test   → patches the example's # syntax= line to doko:local, then runs
            'docker buildx build --load' to produce a testable local image
 
+For tool checks use the Taskfile:
+  task check    Verify all required tools
+
 Architecture: ${ARCH}
 Local image:  ${LOCAL_IMAGE}
 EOF
@@ -171,7 +135,6 @@ check_repo
 
 case "${1:-}" in
     "")                      usage      ;;
-    "check")                 check_tools ;;
     "build")                 cmd_build  ;;
     "test")                  cmd_test "${2:-nginx}" ;;
     "help"|"--help"|"-h")    usage      ;;
