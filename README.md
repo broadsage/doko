@@ -1,12 +1,6 @@
 # Doko — Declarative OCI Kit Orchestrator
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/broadsage/doko/main/docs/assets/logo.png" alt="Doko Logo" width="120" style="border-radius: 20%;" onerror="this.style.display='none'"/>
-</p>
-
-<h3 align="center">Doko</h3>
-
-<p align="center">
   <strong>Declarative, hardened OCI container images — without writing a single Dockerfile.</strong>
 </p>
 
