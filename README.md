@@ -45,14 +45,14 @@ graph LR
 
 Traditional Dockerfiles are imperative, prone to security misconfigurations, and difficult to audit. Doko brings declarative clarity to OCI image composition:
 
-| Feature | Dockerfiles | Chainguard (apko) | **Doko** |
-| :--- | :---: | :---: | :---: |
-| **Declarative Spec** | ❌ (Imperative) | ✅ | **✅ Yes** |
-| **Target OS** | Alpine, Debian, etc. | Wolfi / Alpine | **Alpine** |
-| **Multi-Stage Builds** | ✅ | ❌ | **✅ Yes (via `outputs:`)** |
-| **Negative Packages** | ❌ | ❌ | **✅ Yes (`!pkg` removal)** |
-| **Custom Compilations**| ❌ | ❌ | **✅ Yes (native pipeline templates)** |
-| **Open Source** | ✅ | ✅ | **✅ 100% Apache-2.0** |
+| Feature | Dockerfiles | Docker DHI | Chainguard (apko) | **Doko** |
+| :--- | :---: | :---: | :---: | :---: |
+| **Declarative Spec** | ❌ (Imperative) | ❌ | ✅ | **✅ Yes** |
+| **Target OS** | Alpine, Debian, etc. | Alpine, Debian | Wolfi / Alpine | **Alpine** |
+| **Multi-Stage Builds** | ✅ | ✅ | ❌ | **✅ Yes (via `outputs:`)** |
+| **Negative Packages** | ❌ | ✅ (`!pkg`) | ❌ | **✅ Yes (`!pkg` removal)** |
+| **Custom Compilations**| ❌ | ❌ | ❌ | **✅ Yes (native pipeline templates)** |
+| **Open Source** | ✅ | Partial | ✅ | **✅ 100% Apache-2.0** |
 
 ---
 
