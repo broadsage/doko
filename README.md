@@ -47,12 +47,12 @@ Traditional Dockerfiles are imperative, prone to security misconfigurations, and
 
 | Feature | Dockerfiles | Docker DHI | Chainguard (apko) | **Doko** |
 | :--- | :---: | :---: | :---: | :---: |
-| **Declarative Spec** | ❌ (Imperative) | Partial (via catalog) | ✅ | **✅ Yes** |
+| **Declarative Spec** | ❌ (Imperative) | ✅ Yes | ✅ | **✅ Yes** |
 | **Target OS** | Alpine, Debian, etc. | Alpine, Debian | Wolfi / Alpine | **Alpine** |
 | **Multi-Stage Builds** | ✅ | ✅ | ❌ | **✅ Yes (via `outputs:`)** |
 | **Negative Packages** | ❌ | ✅ (`!pkg`) | ❌ | **✅ Yes (`!pkg` removal)** |
 | **Custom Compilations**| ❌ | ❌ | ❌ | **✅ Yes (native pipeline templates)** |
-| **Open Source** | ✅ | Partial | ✅ | **✅ 100% Apache-2.0** |
+| **Open Source** | ✅ | ✅ 100% Apache-2.0 | ✅ | **✅ 100% Apache-2.0** |
 
 ---
 
