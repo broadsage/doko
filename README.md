@@ -143,9 +143,11 @@ packages:
 
 ---
 
-## GitHub Action
+## GitHub Actions CI/CD Integration
 
-Doko can be easily integrated into your GitHub Actions CI/CD pipelines to build, sign, and push hardened container images:
+Doko can be easily integrated into your GitHub Actions pipelines using the official Docker `build-push-action`.
+
+Simply point the `file` parameter to your `doko.yaml` configuration:
 
 ```yaml
 steps:
@@ -158,8 +160,9 @@ steps:
     uses: docker/setup-buildx-action@v3
 
   - name: Build and Load Image
-    uses: broadsage/doko@v1
+    uses: docker/build-push-action@v6
     with:
+      context: .
       file: 'doko.yaml'
       tags: 'my-secure-app:latest'
       load: true
