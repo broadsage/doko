@@ -67,6 +67,12 @@ jobs:
       - name: Run tests
         run: task test
 
+      - name: Upload Coverage to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-coverage
+          path: coverage.out
+
   goreleaser:
     name: goreleaser check
     runs-on: ubuntu-latest

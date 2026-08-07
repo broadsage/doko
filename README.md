@@ -32,8 +32,10 @@ graph LR
 
 ## Table of Contents
 
-- [Why Doko?](#why-doko)
+- [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Lockfiles (`doko.lock`)](#lockfiles-dokolock)
+- [GitHub Action](#github-action)
 - [Key Features](#key-features)
 - [Project Structure](#project-structure)
 - [Development & Contributing](#development--contributing)
@@ -53,6 +55,23 @@ Traditional Dockerfiles are imperative, prone to security misconfigurations, and
 | **Negative Packages** | ❌ | ✅ (`!pkg`) | ❌ | **✅ Yes (`!pkg` removal)** |
 | **Custom Compilations**| ❌ | ❌ | ❌ | **✅ Yes (native pipeline templates)** |
 | **Open Source** | ✅ | ✅ 100% Apache-2.0 | ✅ | **✅ 100% Apache-2.0** |
+
+## Installation
+
+### 1. From Precompiled Binaries
+You can download the precompiled binary from the [GitHub Releases](https://github.com/broadsage/doko/releases) page.
+
+### 2. Using Go
+If you have Go installed (v1.25+), you can install Doko directly:
+```bash
+go install github.com/broadsage/doko/cmd/doko@latest
+```
+
+### 3. Docker / BuildKit Integration
+Doko is designed to run natively as a BuildKit frontend. You do not need to install the binary to build container images; simply point the syntax directive in your `doko.yaml` to the published frontend image:
+```yaml
+# syntax=ghcr.io/broadsage/doko:latest
+```
 
 ---
 
@@ -103,6 +122,47 @@ Run the build command from your terminal:
 
 ```bash
 docker buildx build -f doko.yaml --tag my-secure-app:latest --load .
+```
+
+---
+
+## Lockfiles (`doko.lock`)
+
+To guarantee reproducible builds, Doko supports package lockfiles. If a `doko.lock` file is present in the build context, Doko will enforce the exact versions specified in the lockfile rather than fetching the latest available versions from the repository indices.
+
+Example `doko.lock`:
+```yaml
+provider: apk
+arch: amd64
+packages:
+  - name: nginx
+    version: 1.26.3-r0
+  - name: curl
+    version: 8.5.0-r0
+```
+
+---
+
+## GitHub Action
+
+Doko can be easily integrated into your GitHub Actions CI/CD pipelines to build, sign, and push hardened container images:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  
+  - name: Set up QEMU
+    uses: docker/setup-qemu-action@v3
+    
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v3
+
+  - name: Build and Load Image
+    uses: broadsage/doko@v1
+    with:
+      file: 'doko.yaml'
+      tags: 'my-secure-app:latest'
+      load: true
 ```
 
 ---

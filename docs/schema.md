@@ -33,6 +33,7 @@ Doko validates the schema at **build-time** and rejects any configuration that v
 - [`runtime` — Container Runtime Configuration](#runtime--container-runtime-configuration)
 - [`stop-signal` — Process Stop Signal](#stop-signal--process-stop-signal)
 - [`timeout-seconds` — Network Request Timeout](#timeout-seconds--network-request-timeout)
+- [Lockfiles (`doko.lock`)](#lockfiles-dokolock)
 - [Complete Example](#complete-example)
 
 ---
@@ -539,7 +540,34 @@ entrypoint: ["nginx", "-g", "daemon off;"]
 cmd: ["-c", "/etc/nginx/nginx.conf"]
 ```
 
+---
 
+## Lockfiles (`doko.lock`)
+
+**Purpose:** Enforce reproducible package resolution. If a `doko.lock` file is present in the same directory as the build context, Doko skips remote index-based package resolution and locks to the versions, architecture, and checksums specified in the lockfile.
+
+### Lockfile Schema
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `provider` | `string` | ✅ Yes | The package provider ecosystem (e.g. `apk`). |
+| `arch` | `string` | ✅ Yes | Target architecture (e.g. `amd64`, `arm64`). |
+| `packages` | `[]object` | ✅ Yes | List of package entries to lock. |
+
+### `packages[]`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | ✅ Yes | The package name. |
+| `version` | `string` | ✅ Yes | Exact locked version. |
+
+```yaml
+provider: apk
+arch: amd64
+packages:
+  - name: nginx
+    version: 1.26.3-r0
+```
 
 ---
 

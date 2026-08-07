@@ -25,7 +25,7 @@ tasks:
     desc: Run the Go package test suite
     deps: [generate]
     cmds:
-      - go test ./... -race -count=1
+      - go test ./... -race -count=1 -coverprofile=coverage.out
 
   lint:
     desc: Run golangci-lint analysis
