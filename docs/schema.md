@@ -20,7 +20,6 @@ Doko validates the schema at **build-time** and rejects any configuration that v
 - [`environment` — Runtime Environment](#environment--runtime-environment)
 - [`annotations` — OCI Annotations](#annotations--oci-annotations)
 - [`os-release` — OS Identity Override](#os-release--os-identity-override)
-- [`security` — Security Policy & Sandbox Profiles](#security--security-policy--sandbox-profiles)
 - [`accounts` — Users & Groups](#accounts--users--groups)
 - [`builds` — Multi-Stage Sub-Builds](#builds--multi-stage-sub-builds)
 - [`contents` — Main Stage Contents](#contents--main-stage-contents)
@@ -55,7 +54,6 @@ These fields are defined at the root level of `doko.yaml`.
 | `environment` | `map[string]string` | No | Runtime environment variables set in the final OCI image config. |
 | `annotations` | `map[string]string` | No | OCI manifest annotations. |
 | `os-release` | `object` | No | Override the `/etc/os-release` file inside the image. |
-| `security` | `object` | No | Security policies and runtime sandbox profiles. |
 | `accounts` | `object` | No | User and group definitions inside the image. |
 | `builds` | `[]object` | No | Named multi-stage sub-builds (analogous to `FROM ... AS` in Dockerfiles). |
 | `contents` | `object` | No | Packages, paths, and pipeline for the main (final) image stage. |

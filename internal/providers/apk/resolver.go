@@ -1,4 +1,4 @@
-// Package apk implements the Alpine APK package resolver for LayerKit.
+// Package apk implements the Alpine APK package resolver for Doko.
 // It fetches and parses the APKINDEX.tar.gz from Alpine Linux repositories
 // to resolve package names into full metadata.
 package apk

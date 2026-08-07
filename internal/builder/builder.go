@@ -14,7 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/broadsage/doko/internal/config"
-	layerkitllb "github.com/broadsage/doko/internal/llb"
+	dokollb "github.com/broadsage/doko/internal/llb"
 	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/providers"
 	_ "github.com/broadsage/doko/internal/providers/apk"
@@ -42,7 +42,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	// 3. Parse and validate the YAML configuration.
 	spec, err := config.Parse(bytes.NewReader(src.Data))
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse layerkit config: %w", err)
+		return nil, fmt.Errorf("failed to parse doko config: %w", err)
 	}
 
 	// 3.5 Parse build arguments from client options and merge into spec.Vars
@@ -77,15 +77,8 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	caClient := &http.Client{Timeout: timeoutDuration}
 	for _, certPath := range spec.Contents.CACertificates {
 		if strings.HasPrefix(certPath, "http://") || strings.HasPrefix(certPath, "https://") {
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, certPath, nil)
-			if err == nil {
-				resp, err := caClient.Do(req)
-				if err == nil && resp.StatusCode == http.StatusOK {
-					defer func() { _ = resp.Body.Close() }()
-					if data, err := io.ReadAll(resp.Body); err == nil {
-						caCerts = append(caCerts, data)
-					}
-				}
+			if data, err := fetchCACert(ctx, caClient, certPath); err == nil {
+				caCerts = append(caCerts, data)
 			}
 		} else {
 			if srcCert, err := bc.ReadEntrypoint(ctx, certPath); err == nil {
@@ -209,7 +202,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
-	gen := layerkitllb.NewGenerator(spec, c)
+	gen := dokollb.NewGenerator(spec, c)
 	def, err := gen.Generate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("generate LLB definition: %w", err)
@@ -235,4 +228,27 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	fmt.Fprintf(os.Stderr, "[doko] buildPlatformResult successfully returning result\n")
 
 	return result, nil
+}
+
+// fetchCACert downloads a CA certificate from the given URL.
+// The response body is properly closed before returning, avoiding resource leaks
+// when called in a loop.
+func fetchCACert(ctx context.Context, client *http.Client, certURL string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, certURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create CA cert request for %s: %w", certURL, err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch CA cert from %s: %w", certURL, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("fetch CA cert from %s: status %d", certURL, resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read CA cert from %s: %w", certURL, err)
+	}
+	return data, nil
 }

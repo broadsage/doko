@@ -1,4 +1,4 @@
-// Package llb translates a parsed LayerKit Spec into a BuildKit LLB definition.
+// Package llb translates a parsed Doko Spec into a BuildKit LLB definition.
 package llb
 
 import (
@@ -24,7 +24,7 @@ type localAPK struct {
 	bytes    []byte
 }
 
-// Generator translates a parsed LayerKit spec into a BuildKit LLB state.
+// Generator translates a parsed Doko spec into a BuildKit LLB state.
 type Generator struct {
 	Spec      *config.Spec
 	Client    gwclient.Client

@@ -1,0 +1,83 @@
+---
+name: 🐛 Bug Report
+description: Report a bug or unexpected behaviour in Doko.
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much detail as possible so we can reproduce and fix it quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug.
+      placeholder: What happened? What did you expect to happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: doko-yaml
+    attributes:
+      label: "doko.yaml (redact secrets)"
+      description: Paste the `doko.yaml` that triggered the issue. Redact any sensitive values.
+      render: yaml
+    validations:
+      required: false
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Full Error Output
+      description: Paste the complete error output from the build.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: List the exact steps to reproduce the bug.
+      placeholder: |
+        1. Create doko.yaml with ...
+        2. Run `docker buildx build -f doko.yaml --load .`
+        3. Observe error ...
+    validations:
+      required: true
+
+  - type: input
+    id: doko-version
+    attributes:
+      label: Doko Version
+      description: "Output of `./doko version` or the `# syntax=` tag."
+      placeholder: "v1.2.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: "OS and architecture (e.g. `macOS arm64`, `Linux amd64`)."
+      placeholder: "macOS arm64"
+    validations:
+      required: true
+
+  - type: input
+    id: docker-version
+    attributes:
+      label: Docker / BuildKit Version
+      description: "Output of `docker version --format '{{.Server.Version}}'`."
+      placeholder: "27.1.2"
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Add any other context, screenshots, or logs.
+    validations:
+      required: false

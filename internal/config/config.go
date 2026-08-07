@@ -161,7 +161,7 @@ type RuntimeConfig struct {
 	Env   map[string]string `yaml:"env"         json:"env,omitempty"`
 }
 
-// supportedProviders is the set of provider names LayerKit currently supports.
+// supportedProviders is the set of provider names Doko currently supports.
 var supportedProviders = map[string]bool{
 	"apk": true,
 }
@@ -221,7 +221,7 @@ func validateConfig(data []byte) error {
 	return nil
 }
 
-// Parse reads a LayerKit YAML configuration from a reader.
+// Parse reads a Doko YAML configuration from a reader.
 func Parse(r io.Reader) (*Spec, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -236,7 +236,7 @@ func Parse(r io.Reader) (*Spec, error) {
 	}
 	var spec Spec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("failed to decode layerkit config: %w", err)
+		return nil, fmt.Errorf("failed to decode doko config: %w", err)
 	}
 	if err := spec.Validate(); err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ func Parse(r io.Reader) (*Spec, error) {
 	return &spec, nil
 }
 
-// ParseFile reads a LayerKit YAML configuration from a file path.
+// ParseFile reads a Doko YAML configuration from a file path.
 func ParseFile(path string) (*Spec, error) {
 	f, err := os.Open(path)
 	if err != nil {
@@ -330,7 +330,7 @@ func (s *Spec) Validate() error {
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("layerkit config validation failed:\n  - %s", strings.Join(errs, "\n  - "))
+		return fmt.Errorf("doko config validation failed:\n  - %s", strings.Join(errs, "\n  - "))
 	}
 	return nil
 }
