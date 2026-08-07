@@ -1,3 +1,5 @@
-FROM alpine:3.23
+FROM alpine:3.23 AS alpine
+FROM scratch
+COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY doko /bin/doko
 ENTRYPOINT ["/bin/doko"]

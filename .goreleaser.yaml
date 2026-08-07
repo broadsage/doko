@@ -127,3 +127,9 @@ signs:
 release:
   draft: false
   prerelease: auto
+
+sboms:
+  - artifacts: archive
+
+provenance:
+  - enabled: true

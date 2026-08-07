@@ -15,8 +15,9 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /doko ./cmd/doko
 
 # Final stage: minimal image with only the frontend binary
-FROM alpine:3.23
+FROM scratch
 
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /doko /bin/doko
 
 ENTRYPOINT ["/bin/doko"]
