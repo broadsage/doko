@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"maps"
 	"testing"
 )
 
@@ -84,9 +85,7 @@ func TestSubstituteRecursive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			copiedVars := make(map[string]string)
-			for k, v := range tt.vars {
-				copiedVars[k] = v
-			}
+			maps.Copy(copiedVars, tt.vars)
 			result := SubstituteRecursive(tt.input, copiedVars, tt.maxIterations)
 			if result != tt.expected {
 				t.Errorf("SubstituteRecursive() = %q, expected %q", result, tt.expected)

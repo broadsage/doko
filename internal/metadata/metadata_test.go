@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/broadsage/doko/internal/config"
 	"github.com/moby/buildkit/frontend/gateway/client"
+
+	"github.com/broadsage/doko/internal/config"
 )
 
 func TestSetImageConfig(t *testing.T) {
