@@ -62,12 +62,17 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 	}
 
 	var lockedPkgs map[string]string
+	var lockedChecksums map[string]string
 	if len(lockData) > 0 {
 		var lf providers.Lockfile
 		if err := yaml.Unmarshal(lockData, &lf); err == nil {
 			lockedPkgs = make(map[string]string)
+			lockedChecksums = make(map[string]string)
 			for _, p := range lf.Packages {
 				lockedPkgs[p.Name] = p.Version
+				if p.Checksum != "" {
+					lockedChecksums[p.Name] = p.Checksum
+				}
 			}
 		}
 	}
@@ -108,7 +113,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 		parts := strings.Split(platforms[0], "/")
 		arch := parts[len(parts)-1]
 		spec.Arch = arch
-		return buildPlatformResult(ctx, c, spec, lockedPkgs, caCerts)
+		return buildPlatformResult(ctx, c, spec, lockedPkgs, lockedChecksums, caCerts)
 	}
 
 	// Multi-platform manifest generation
@@ -148,7 +153,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 		platformSpec := *spec
 		platformSpec.Arch = archVal
 
-		subRes, err := buildPlatformResult(ctx, c, &platformSpec, lockedPkgs, caCerts)
+		subRes, err := buildPlatformResult(ctx, c, &platformSpec, lockedPkgs, lockedChecksums, caCerts)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build platform %s: %w", p, err)
 		}
@@ -168,7 +173,7 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 }
 
 // buildPlatformResult compiles and solves the image filesystem and metadata for a given target architecture.
-func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, lockedPkgs map[string]string, caCerts [][]byte) (*client.Result, error) {
+func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec, lockedPkgs map[string]string, lockedChecksums map[string]string, caCerts [][]byte) (*client.Result, error) {
 	// 1. Construct a resolver for the specified package provider.
 	timeoutDuration := time.Duration(spec.TimeoutSeconds) * time.Second
 
@@ -199,6 +204,16 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		return nil, fmt.Errorf("[doko] package resolution via %s failed: %w", res.Name(), err)
 	}
 	fmt.Fprintf(os.Stderr, "[doko] resolved %d packages via %s\n", len(resolvedPkgs), res.Name())
+
+	// Validate checksums if lockfile specifies them
+	if len(lockedChecksums) > 0 {
+		for _, pkg := range resolvedPkgs {
+			expected, exists := lockedChecksums[pkg.Name]
+			if exists && pkg.Checksum != "" && expected != pkg.Checksum {
+				return nil, fmt.Errorf("[doko] checksum verification failed for package %q: expected %q, got %q", pkg.Name, expected, pkg.Checksum)
+			}
+		}
+	}
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")

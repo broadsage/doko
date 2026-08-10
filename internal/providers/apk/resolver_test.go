@@ -39,7 +39,7 @@ D:musl pcre2 zlib
 	}
 	r.index = make(map[string]*apkEntry)
 
-	err := r.parseIndex(strings.NewReader(indexContent))
+	err := r.parseIndex(strings.NewReader(indexContent), r.repos[0])
 	if err != nil {
 		t.Fatalf("unexpected error parsing index: %v", err)
 	}
@@ -99,5 +99,38 @@ func TestSplitDeps(t *testing.T) {
 	}
 	if result[0] != "ca-certificates" {
 		t.Errorf("expected first dep 'ca-certificates', got %q", result[0])
+	}
+}
+
+func TestDownloadURLMultiRepo(t *testing.T) {
+	r := &apkResolver{
+		repos: []string{
+			"https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64",
+			"https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64",
+		},
+		arch: "x86_64",
+	}
+
+	entry1 := &apkEntry{
+		Name:    "curl",
+		Version: "8.12.1-r0",
+		RepoURL: r.repos[0],
+	}
+	entry2 := &apkEntry{
+		Name:    "nginx",
+		Version: "1.27.4-r0",
+		RepoURL: r.repos[1],
+	}
+
+	url1 := r.downloadURL(entry1)
+	expected1 := "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/curl-8.12.1-r0.apk"
+	if url1 != expected1 {
+		t.Errorf("expected url %q, got %q", expected1, url1)
+	}
+
+	url2 := r.downloadURL(entry2)
+	expected2 := "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/nginx-1.27.4-r0.apk"
+	if url2 != expected2 {
+		t.Errorf("expected url %q, got %q", expected2, url2)
 	}
 }

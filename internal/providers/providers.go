@@ -58,8 +58,9 @@ type Options struct {
 
 // LockedPackage defines a single package record in lockfile.
 type LockedPackage struct {
-	Name    string `yaml:"name" json:"name"`
-	Version string `yaml:"version" json:"version"`
+	Name     string `yaml:"name" json:"name"`
+	Version  string `yaml:"version" json:"version"`
+	Checksum string `yaml:"checksum,omitempty" json:"checksum,omitempty"`
 }
 
 // Lockfile defines the schema of the doko.lock file.

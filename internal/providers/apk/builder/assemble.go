@@ -3,10 +3,16 @@ package builder
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"compress/gzip"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1" //nolint:gosec // APK format requires SHA-1 checksums per spec
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"hash"
 	"io"
@@ -225,14 +231,77 @@ func AssembleAPK(dataDir, outPath string, s *config.BuildSpec, arch string) erro
 		return fmt.Errorf("control tgz: %w", err)
 	}
 
+	var sigTgz *os.File
+	signingKey := os.Getenv("DOKO_SIGNING_KEY")
+	keyName := os.Getenv("DOKO_KEY_NAME")
+	if signingKey != "" && keyName != "" {
+		block, _ := pem.Decode([]byte(signingKey))
+		if block == nil {
+			return fmt.Errorf("failed to decode DOKO_SIGNING_KEY PEM")
+		}
+		privKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		var rsaKey *rsa.PrivateKey
+		if err != nil {
+			parsedKey, err2 := x509.ParsePKCS8PrivateKey(block.Bytes)
+			if err2 != nil {
+				return fmt.Errorf("failed to parse private key (PKCS1: %w, PKCS8: %w)", err, err2)
+			}
+			var ok bool
+			rsaKey, ok = parsedKey.(*rsa.PrivateKey)
+			if !ok {
+				return fmt.Errorf("only RSA private keys are supported for APK signing")
+			}
+		} else {
+			rsaKey = privKey
+		}
+
+		if _, err := controlTgz.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("seek control tgz: %w", err)
+		}
+		h := sha1.New() //nolint:gosec // APK signature uses SHA1 of control archive
+		if _, err := io.Copy(h, controlTgz); err != nil {
+			return fmt.Errorf("hash control tgz: %w", err)
+		}
+		hashed := h.Sum(nil)
+
+		sig, err := rsa.SignPKCS1v15(rand.Reader, rsaKey, crypto.SHA1, hashed)
+		if err != nil {
+			return fmt.Errorf("sign control tgz: %w", err)
+		}
+
+		sigTgz, err = os.CreateTemp("", "apk-sig-*.tgz")
+		if err != nil {
+			return fmt.Errorf("create sig temp file: %w", err)
+		}
+		defer os.Remove(sigTgz.Name())
+		defer sigTgz.Close()
+
+		_, err = writeTgz(sigTgz, tarCut, func(tw *tar.Writer) error {
+			h := &tar.Header{
+				Name: ".SIGN.RSA." + keyName,
+				Mode: 0o600,
+				Size: int64(len(sig)),
+			}
+			return writeTarFile(tw, h, bytes.NewReader(sig))
+		}, sha1.New()) //nolint:gosec
+		if err != nil {
+			return fmt.Errorf("sig tgz: %w", err)
+		}
+	}
+
 	out, err := os.Create(outPath)
 	if err != nil {
 		return fmt.Errorf("create output APK: %w", err)
 	}
 	defer out.Close()
 
-	// APK = control + data (no signature)
-	for _, f := range []*os.File{controlTgz, dataTgz} {
+	var files []*os.File
+	if sigTgz != nil {
+		files = append(files, sigTgz)
+	}
+	files = append(files, controlTgz, dataTgz)
+
+	for _, f := range files {
 		if _, err := f.Seek(0, io.SeekStart); err != nil {
 			return fmt.Errorf("seek for copy: %w", err)
 		}

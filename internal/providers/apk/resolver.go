@@ -13,6 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/moby/buildkit/client/llb"
 	"github.com/moby/buildkit/frontend/gateway/client"
 
@@ -60,6 +62,7 @@ type apkEntry struct {
 	Dependencies []string
 	Provides     []string
 	Checksum     string
+	RepoURL      string
 }
 
 // SanitizeVersion extracts the stable major/minor Alpine version (e.g., "3.23" from "alpine-3.23.5-minimal").
@@ -120,9 +123,39 @@ func (r *apkResolver) Name() string { return "Alpine APK" }
 func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]providers.Package, error) {
 	r.indexOnce.Do(func() {
 		r.index = make(map[string]*apkEntry)
-		for _, repo := range r.repos {
-			if err := r.fetchIndex(ctx, repo); err != nil {
-				r.indexErr = fmt.Errorf("failed to fetch APKINDEX from %s: %w", repo, err)
+		g, gCtx := errgroup.WithContext(ctx)
+		datas := make([][]byte, len(r.repos))
+
+		for i, repo := range r.repos {
+			g.Go(func() error {
+				data, err := r.fetchIndexData(gCtx, repo)
+				if err != nil {
+					return err
+				}
+				datas[i] = data
+				return nil
+			})
+		}
+
+		if err := g.Wait(); err != nil {
+			r.indexErr = err
+			return
+		}
+
+		for i, repo := range r.repos {
+			data := datas[i]
+			if len(data) == 0 {
+				continue
+			}
+			gz, err := gzip.NewReader(bytes.NewReader(data))
+			if err != nil {
+				r.indexErr = fmt.Errorf("gzip decompress failed for %s: %w", repo, err)
+				return
+			}
+			err = r.parseIndex(gz, repo)
+			_ = gz.Close()
+			if err != nil {
+				r.indexErr = fmt.Errorf("failed to parse APKINDEX from %s: %w", repo, err)
 				return
 			}
 		}
@@ -179,47 +212,41 @@ func (r *apkResolver) Resolve(ctx context.Context, packages []string) ([]provide
 	return resolved, nil
 }
 
-// fetchIndex downloads and parses an APKINDEX.tar.gz from a single repo URL.
-func (r *apkResolver) fetchIndex(ctx context.Context, repoURL string) error {
+// fetchIndexData downloads an APKINDEX.tar.gz from a single repo URL and returns its content.
+func (r *apkResolver) fetchIndexData(ctx context.Context, repoURL string) ([]byte, error) {
 	indexURL := repoURL + "/APKINDEX.tar.gz"
 
 	st := llb.HTTP(indexURL, llb.Filename("APKINDEX.tar.gz"))
 	def, err := st.Marshal(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to marshal APKINDEX HTTP state: %w", err)
+		return nil, fmt.Errorf("failed to marshal APKINDEX HTTP state: %w", err)
 	}
 
 	res, err := r.client.Solve(ctx, client.SolveRequest{
 		Definition: def.ToPB(),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to solve/download APKINDEX from %s: %w", indexURL, err)
+		return nil, fmt.Errorf("failed to solve/download APKINDEX from %s: %w", indexURL, err)
 	}
 
 	ref, err := res.SingleRef()
 	if err != nil {
-		return fmt.Errorf("failed to get result reference for APKINDEX: %w", err)
+		return nil, fmt.Errorf("failed to get result reference for APKINDEX: %w", err)
 	}
 
 	data, err := ref.ReadFile(ctx, client.ReadRequest{
 		Filename: "APKINDEX.tar.gz",
 	})
 	if err != nil {
-		return fmt.Errorf("failed to read APKINDEX archive: %w", err)
+		return nil, fmt.Errorf("failed to read APKINDEX archive: %w", err)
 	}
 
-	gz, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("gzip decompress failed: %w", err)
-	}
-	defer func() { _ = gz.Close() }()
-
-	return r.parseIndex(gz)
+	return data, nil
 }
 
 // parseIndex reads the decompressed APKINDEX content and populates r.index.
 // The format is a series of key:value records separated by blank lines.
-func (r *apkResolver) parseIndex(reader io.Reader) error {
+func (r *apkResolver) parseIndex(reader io.Reader, repoURL string) error {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
@@ -244,7 +271,7 @@ func (r *apkResolver) parseIndex(reader io.Reader) error {
 		}
 
 		if current == nil {
-			current = &apkEntry{Arch: r.arch}
+			current = &apkEntry{Arch: r.arch, RepoURL: repoURL}
 		}
 
 		if len(line) < 2 || line[1] != ':' {
@@ -284,6 +311,9 @@ func (r *apkResolver) parseIndex(reader io.Reader) error {
 
 // downloadURL constructs the package download URL from its metadata.
 func (r *apkResolver) downloadURL(entry *apkEntry) string {
+	if entry.RepoURL != "" {
+		return fmt.Sprintf("%s/%s-%s.apk", entry.RepoURL, entry.Name, entry.Version)
+	}
 	if len(r.repos) == 0 {
 		return ""
 	}
