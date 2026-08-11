@@ -39,9 +39,9 @@ tasks:
       - |
         missing=0
         echo "Checking required tools..."
-        for tool in go docker golangci-lint; do
+        for tool in go docker golangci-lint pre-commit; do
           if command -v "$tool" &>/dev/null; then
-            ver=$("$tool" version 2>/dev/null | head -1 || echo "unknown")
+            ver=$("$tool" version 2>/dev/null | head -1 || "$tool" --version 2>/dev/null | head -1 || echo "unknown")
             echo "  ✓ $tool: $ver"
           else
             echo "  ✗ $tool: not found" >&2
@@ -70,6 +70,7 @@ tasks:
           echo "  go:            https://go.dev/dl/" >&2
           echo "  docker:        https://docs.docker.com/engine/install/" >&2
           echo "  golangci-lint: https://golangci-lint.run/usage/install/" >&2
+          echo "  pre-commit:    https://pre-commit.com/#install" >&2
           echo "  docker buildx: https://docs.docker.com/build/install-buildx/" >&2
           exit 1
         fi
