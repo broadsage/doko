@@ -1,12 +1,12 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "dependencyDashboard": true,
   "extends": [
     "config:recommended",
     "docker:pinDigests",
     ":semanticCommits",
     ":separatePatchReleases"
   ],
-  "schedule": ["before 6am on Monday"],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "labels": ["dependencies"],
