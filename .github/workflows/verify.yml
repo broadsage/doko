@@ -73,6 +73,12 @@ jobs:
           name: code-coverage
           path: coverage.out
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
   goreleaser:
     name: goreleaser check
     runs-on: ubuntu-latest
