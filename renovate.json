@@ -11,8 +11,7 @@
   "prHourlyLimit": 2,
   "labels": ["dependencies"],
   "postUpdateOptions": ["gomodTidy"],
-  "assignees": ["jbramamoorthy"],
-  "reviewers": ["jbramamoorthy"],
+  "reviewers": ["team:maintainers"],
   "packageRules": [
     {
       "description": "Group containerd package updates together",
