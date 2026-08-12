@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://scorecard.dev/viewer/?uri=github.com/broadsage/doko"><img src="https://api.scorecard.dev/projects/github.com/broadsage/doko/badge" alt="OpenSSF Scorecard"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/build.yml"><img src="https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg" alt="Build"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/verify.yml"><img src="https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg" alt="Verify"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/test-examples.yml"><img src="https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg" alt="Test Examples"/></a>
