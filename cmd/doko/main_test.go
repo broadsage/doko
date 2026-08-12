@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -65,5 +67,25 @@ accounts:
 	}
 	if !strings.Contains(err.Error(), "validation failed") {
 		t.Errorf("expected validation failure error, got %v", err)
+	}
+}
+
+func TestShowVersion(t *testing.T) {
+	// Redirect stdout to capture showVersion output
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	showVersion()
+
+	w.Close()
+	os.Stdout = old
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	output := buf.String()
+
+	if !strings.Contains(output, "Doko - BuildKit Image Orchestrator") {
+		t.Errorf("unexpected showVersion output: %q", output)
 	}
 }

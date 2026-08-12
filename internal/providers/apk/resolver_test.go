@@ -1,6 +1,7 @@
 package apk
 
 import (
+	"context"
 	"strings"
 	"testing"
 )
@@ -132,5 +133,82 @@ func TestDownloadURLMultiRepo(t *testing.T) {
 	expected2 := "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/nginx-1.27.4-r0.apk"
 	if url2 != expected2 {
 		t.Errorf("expected url %q, got %q", expected2, url2)
+	}
+}
+
+func TestSanitizeVersion(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"alpine-3.20.1-minimal", "3.20"},
+		{"alpine-3.20", "3.20"},
+		{"3.20.3-slim", "3.20"},
+		{"alpine-edge", "edge"},
+		{"3.20", "3.20"},
+	}
+
+	for _, tc := range tests {
+		got := SanitizeVersion(tc.input)
+		if got != tc.expected {
+			t.Errorf("SanitizeVersion(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+	}
+}
+
+func TestResolveWithOptions(t *testing.T) {
+	r := &apkResolver{
+		repos: []string{"https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64"},
+		arch:  "x86_64",
+		index: map[string]*apkEntry{
+			"curl": {
+				Name:         "curl",
+				Version:      "8.12.1-r0",
+				Arch:         "x86_64",
+				License:      "MIT",
+				Description:  "URL retrieval utility",
+				RepoURL:      "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64",
+				Dependencies: []string{"libcurl"},
+			},
+			"libcurl": {
+				Name:         "libcurl",
+				Version:      "8.12.1-r0",
+				Arch:         "x86_64",
+				License:      "MIT",
+				Description:  "The multiprotocol file transfer library",
+				RepoURL:      "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64",
+				Dependencies: []string{"musl"},
+			},
+			"musl": {
+				Name:         "musl",
+				Version:      "1.2.5-r0",
+				Arch:         "x86_64",
+				License:      "MIT",
+				Description:  "standard library",
+				RepoURL:      "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64",
+				Dependencies: nil,
+			},
+		},
+	}
+
+	// Make sure the indexOnce block is bypassed since r.index is already populated.
+	// But indexOnce runs once. So we must trigger r.indexOnce.Do() so that Resolve doesn't trigger the fetch.
+	r.indexOnce.Do(func() {})
+
+	ctx := context.Background()
+	pkgs, err := r.Resolve(ctx, []string{"curl"})
+	if err != nil {
+		t.Fatalf("unexpected error resolving packages: %v", err)
+	}
+
+	// We expect curl, libcurl, musl to be resolved.
+	if len(pkgs) != 3 {
+		t.Fatalf("expected 3 packages, got %d", len(pkgs))
+	}
+
+	// Test resolve package that does not exist in the index
+	_, err = r.Resolve(ctx, []string{"nonexistent"})
+	if err == nil {
+		t.Error("expected error resolving nonexistent package, got nil")
 	}
 }

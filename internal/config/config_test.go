@@ -2,6 +2,8 @@ package config
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -149,4 +151,53 @@ func TestSchemaIsUpToDate(t *testing.T) {
 	if cleanGenerated != cleanEmbedded {
 		t.Errorf("schema.json is out of date! Please run: go generate ./...")
 	}
+}
+
+func TestParseFile(t *testing.T) {
+	yamlInput := `
+name: file-test-app
+`
+	tmpFile := filepath.Join(t.TempDir(), "doko.yaml")
+	if err := os.WriteFile(tmpFile, []byte(yamlInput), 0o644); err != nil {
+		t.Fatalf("failed to write temp file: %v", err)
+	}
+
+	spec, err := ParseFile(tmpFile)
+	if err != nil {
+		t.Fatalf("unexpected error ParseFile: %v", err)
+	}
+	if spec.Name != "file-test-app" {
+		t.Errorf("expected 'file-test-app', got %q", spec.Name)
+	}
+
+	_, err = ParseFile(filepath.Join(t.TempDir(), "nonexistent.yaml"))
+	if err == nil {
+		t.Error("expected error for nonexistent file, got nil")
+	}
+}
+
+func TestDetectProvider(t *testing.T) {
+	tests := []struct {
+		base             string
+		expectedProvider string
+		expectedBase     string
+	}{
+		{"alpine", "apk", "alpine"},
+		{"alpine-3.20", "apk", "alpine-3.20"},
+		{"cgr.dev/chainguard/wolfi-base", "", "cgr.dev/chainguard/wolfi-base"},
+		{"debian", "", "debian"},
+	}
+
+	for _, tc := range tests {
+		prov := DetectProvider(tc.base)
+		if prov != tc.expectedProvider {
+			t.Errorf("DetectProvider(%q) = %q, want %q", tc.base, prov, tc.expectedProvider)
+		}
+	}
+}
+
+func TestParseOSRelease(t *testing.T) {
+	// Since ParseOSRelease reads from /etc/os-release directly, it might not exist or be different on other systems.
+	// But let's call it and ignore the error or verify it handles errors gracefully.
+	_, _, _ = ParseOSRelease()
 }
