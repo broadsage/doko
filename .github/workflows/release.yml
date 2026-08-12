@@ -24,7 +24,7 @@ jobs:
 
       # Full-depth checkout with credentials so the tag action can push via git.
       # fetch-depth: 0 is needed for git describe / git diff against previous tags.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -85,7 +85,7 @@ jobs:
           fetch_all_tags: true
 
       # Re-checkout at the new (or existing) tag with full history for GoReleaser.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         if: steps.check.outputs.need_release == 'yes'
         with:
           persist-credentials: false
