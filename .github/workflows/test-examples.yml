@@ -35,6 +35,7 @@ jobs:
         with:
           go-version-file: './go.mod'
           check-latest: true
+          cache: true
 
       - name: test ${{ matrix.example }} example
         run: go test ./examples/... -v -count=1 -run TestExampleConfigs/${{ matrix.example }}

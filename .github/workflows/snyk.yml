@@ -31,6 +31,7 @@ jobs:
         with:
           go-version-file: './go.mod'
           check-latest: true
+          cache: true
 
       - name: Run Snyk to check Go modules for vulnerabilities
         uses: snyk/actions/golang@12140f4059e244892ae643824a95459a102120dd # master
