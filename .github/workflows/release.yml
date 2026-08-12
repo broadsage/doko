@@ -99,7 +99,7 @@ jobs:
           check-latest: true
 
       - name: Log in to the Container registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         if: steps.check.outputs.need_release == 'yes'
         with:
           registry: ghcr.io
