@@ -4,7 +4,7 @@ go 1.26.3
 
 require (
 	github.com/google/jsonschema-go v0.4.3
-	github.com/moby/buildkit v0.31.2
+	github.com/moby/buildkit v0.32.2
 	github.com/opencontainers/image-spec v1.1.1
 	golang.org/x/sync v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
