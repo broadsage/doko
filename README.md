@@ -9,6 +9,7 @@
   <a href="https://github.com/broadsage/doko/actions/workflows/verify.yml"><img src="https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg" alt="Verify"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/test-examples.yml"><img src="https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg" alt="Test Examples"/></a>
   <a href="https://codecov.io/gh/broadsage/doko"><img src="https://codecov.io/gh/broadsage/doko/branch/main/graph/badge.svg" alt="Coverage"/></a>
+  <a href="https://snyk.io/test/github/broadsage/doko"><img src="https://snyk.io/test/github/broadsage/doko/badge.svg" alt="Snyk Vulnerability Badge"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"/></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/broadsage/doko" alt="Go version"/></a>
   <a href="https://github.com/broadsage/doko/releases/latest"><img src="https://img.shields.io/github/v/release/broadsage/doko?label=Release" alt="Latest Release"/></a>
