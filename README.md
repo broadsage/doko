@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://scorecard.dev/viewer/?uri=github.com/broadsage/doko"><img src="https://api.scorecard.dev/projects/github.com/broadsage/doko/badge" alt="OpenSSF Scorecard"/></a>
   <a href="https://www.bestpractices.dev/projects/14037"><img src="https://www.bestpractices.dev/projects/14037/badge"></a>
+  <a href="https://www.bestpractices.dev/projects/14037"><img src="https://www.bestpractices.dev/projects/14037/baseline"></a>
   <a href="https://slsa.dev"><img src="https://slsa.dev/images/gh-badge-level3.svg" alt="SLSA 3"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/build.yml"><img src="https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg" alt="Build"/></a>
   <a href="https://codecov.io/gh/broadsage/doko"><img src="https://codecov.io/gh/broadsage/doko/branch/main/graph/badge.svg" alt="Coverage"/></a>
