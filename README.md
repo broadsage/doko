@@ -6,9 +6,9 @@
 
 <p align="center">
   <a href="https://scorecard.dev/viewer/?uri=github.com/broadsage/doko"><img src="https://api.scorecard.dev/projects/github.com/broadsage/doko/badge" alt="OpenSSF Scorecard"/></a>
+  <a href="https://www.bestpractices.dev/projects/14037"><img src="https://www.bestpractices.dev/projects/14037/badge"></a>
+  <a href="https://slsa.dev"><img src="https://slsa.dev/images/gh-badge-level3.svg" alt="SLSA 3"/></a>
   <a href="https://github.com/broadsage/doko/actions/workflows/build.yml"><img src="https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg" alt="Build"/></a>
-  <a href="https://github.com/broadsage/doko/actions/workflows/verify.yml"><img src="https://github.com/broadsage/doko/actions/workflows/verify.yml/badge.svg" alt="Verify"/></a>
-  <a href="https://github.com/broadsage/doko/actions/workflows/test-examples.yml"><img src="https://github.com/broadsage/doko/actions/workflows/test-examples.yml/badge.svg" alt="Test Examples"/></a>
   <a href="https://codecov.io/gh/broadsage/doko"><img src="https://codecov.io/gh/broadsage/doko/branch/main/graph/badge.svg" alt="Coverage"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"/></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/broadsage/doko" alt="Go version"/></a>
