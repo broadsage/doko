@@ -1,4 +1,4 @@
-name: Release
+name: Release Doko
 
 on:
   schedule:
@@ -97,6 +97,7 @@ jobs:
         with:
           go-version-file: './go.mod'
           check-latest: true
+          cache: true
 
       - name: Log in to the Container registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
