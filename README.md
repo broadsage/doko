@@ -9,7 +9,7 @@
   <a href="https://www.bestpractices.dev/projects/14037"><img src="https://www.bestpractices.dev/projects/14037/badge"></a>
   <a href="https://www.bestpractices.dev/projects/14037"><img src="https://www.bestpractices.dev/projects/14037/baseline"></a>
   <a href="https://slsa.dev"><img src="https://slsa.dev/images/gh-badge-level3.svg" alt="SLSA 3"/></a>
-  <a href="https://github.com/broadsage/doko/actions/workflows/build.yml"><img src="https://github.com/broadsage/doko/actions/workflows/build.yml/badge.svg" alt="Build"/></a>
+  <a href="https://github.com/broadsage/doko/actions/workflows/ci.yml"><img src="https://github.com/broadsage/doko/actions/workflows/ci.yml/badge.svg" alt="Build & Verify"/></a>
   <a href="https://codecov.io/gh/broadsage/doko"><img src="https://codecov.io/gh/broadsage/doko/branch/main/graph/badge.svg" alt="Coverage"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache--2.0-blue.svg" alt="License"/></a>
   <a href="go.mod"><img src="https://img.shields.io/github/go-mod/go-version/broadsage/doko" alt="Go version"/></a>
@@ -17,6 +17,8 @@
 </p>
 
 ---
+
+<img src="assets/snyk-badge.png" align="right" alt="Snyk Vulnerability Scanning" width="120" style="margin-left: 20px; margin-bottom: 10px;" />
 
 **Doko** is an open-source, next-generation [BuildKit](https://github.com/moby/buildkit) frontend that compiles a simple `doko.yaml` specification directly into a minimal, hardened, policy-compliant OCI container image. 
 
