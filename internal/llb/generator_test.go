@@ -24,7 +24,7 @@ func TestGenerate_WithPipelineAndKeyring(t *testing.T) {
 			},
 		},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -57,7 +57,7 @@ func TestGenerate_MultiStageBuild(t *testing.T) {
 		},
 		Contents: config.ContentsConfig{},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -88,7 +88,7 @@ func TestGenerate_WithAccounts(t *testing.T) {
 			},
 		},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestGenerate_WithWorkDir(t *testing.T) {
 		Base:     "alpine-3.23",
 		WorkDir:  "/var/app/custom",
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -128,7 +128,7 @@ func TestGenerate_WithPrivileged(t *testing.T) {
 			},
 		},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -141,7 +141,7 @@ func TestGenerate_NginxConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to parse nginx config file: %v", err)
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err = g.Generate(ctx)
 	if err != nil {
@@ -166,7 +166,7 @@ func TestGenerate_SubBuildWithCACertificates(t *testing.T) {
 			},
 		},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
@@ -195,7 +195,7 @@ func TestGenerate_WithSecretsAndNetwork(t *testing.T) {
 			},
 		},
 	}
-	g := NewGenerator(spec, nil)
+	g := NewGenerator(spec, nil, nil)
 	ctx := context.Background()
 	_, err := g.Generate(ctx)
 	if err != nil {
