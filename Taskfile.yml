@@ -97,7 +97,7 @@ tasks:
     cmds:
       - ./hack/make-image.sh test {{.pkg}}
     vars:
-      pkg: nginx
+      pkg: '{{.pkg | default "nginx"}}'
 
   clean:
     desc: Remove local binaries and build files

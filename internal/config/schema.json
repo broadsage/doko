@@ -641,6 +641,15 @@
     },
     "timeout-seconds": {
       "type": "integer"
+    },
+    "ignore-rules": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#",

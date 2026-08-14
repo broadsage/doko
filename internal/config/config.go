@@ -44,6 +44,7 @@ type Spec struct {
 	EntryPoint     []string          `yaml:"entrypoint"  json:"entrypoint,omitempty"`
 	Cmd            []string          `yaml:"cmd"         json:"cmd,omitempty"`
 	TimeoutSeconds int               `yaml:"timeout-seconds" json:"timeout-seconds,omitempty"`
+	IgnoreRules    []string          `yaml:"ignore-rules" json:"ignore-rules,omitempty"`
 }
 
 // OSReleaseConfig defines fields for customizing /etc/os-release inside the image.

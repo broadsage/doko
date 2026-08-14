@@ -32,6 +32,12 @@ func main() {
 				os.Exit(1)
 			}
 			os.Exit(0)
+		case "lint":
+			if err := runLint(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Lint Error: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
 		}
 	}
 
@@ -107,5 +113,40 @@ func runValidate(args []string) error {
 		return fmt.Errorf("validation failed for %s: %w", filePath, err)
 	}
 	fmt.Printf("Success: %s is valid!\n", filePath)
+	return nil
+}
+
+func runLint(args []string) error {
+	filePath := "doko.yaml"
+	if len(args) > 0 {
+		filePath = args[0]
+	}
+	filePath = filepath.Clean(filePath)
+	spec, err := config.ParseFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	result, err := config.Lint(appcontext.Context(), spec)
+	if err != nil {
+		return fmt.Errorf("linting failed: %w", err)
+	}
+
+	for _, w := range result.Warnings {
+		fmt.Fprintf(os.Stderr, "WARNING: %s\n", w)
+	}
+	for _, e := range result.Errors {
+		fmt.Fprintf(os.Stderr, "ERROR: %s\n", e)
+	}
+
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("security policies violated (%d errors, %d warnings)", len(result.Errors), len(result.Warnings))
+	}
+
+	if len(result.Warnings) > 0 {
+		fmt.Printf("Linting passed with %d warning(s).\n", len(result.Warnings))
+	} else {
+		fmt.Println("Success: Config complies with all security policies.")
+	}
 	return nil
 }
