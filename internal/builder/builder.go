@@ -235,10 +235,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 	}
 
 	// 3.5. Generate Software Bill of Materials (SBOM) via Syft
-	imageName := spec.Name
-	if imageName == "" {
-		imageName = "dhi-image"
-	}
+	imageName := metadata.GetCleanImageName(spec.Image)
 	sbomBytes, err := metadata.GenerateSBOM(ctx, imageName, resolvedPkgs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate SBOM: %w", err)

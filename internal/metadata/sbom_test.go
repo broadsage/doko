@@ -22,7 +22,7 @@ func TestGenerateSBOM(t *testing.T) {
 		},
 	}
 
-	payload, err := GenerateSBOM(context.Background(), "dhi-curl-image", resolved)
+	payload, err := GenerateSBOM(context.Background(), "bhi-curl-image", resolved)
 	if err != nil {
 		t.Fatalf("failed to generate SBOM: %v", err)
 	}
@@ -46,5 +46,24 @@ func TestGenerateSBOM(t *testing.T) {
 	}
 	if !strings.Contains(payloadStr, "8.5.0-r0") {
 		t.Error("expected SBOM to contain package version '8.5.0-r0', but it was missing")
+	}
+}
+
+func TestGetCleanImageName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"ghcr.io/broadsage/doko/alpine", "bhi-alpine"},
+		{"ghcr.io/broadsage/doko/postgres:latest", "bhi-postgres"},
+		{"my-registry.org/custom-app:1.2.3@sha256:12345", "bhi-custom-app"},
+		{"", "bhi-image"},
+	}
+
+	for _, tc := range tests {
+		got := GetCleanImageName(tc.input)
+		if got != tc.expected {
+			t.Errorf("GetCleanImageName(%q) = %q; expected %q", tc.input, got, tc.expected)
+		}
 	}
 }

@@ -16,6 +16,7 @@ import (
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/broadsage/doko/internal/config"
+	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/providers"
 	"github.com/broadsage/doko/internal/utils"
 )
@@ -628,10 +629,7 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 
 	// 2. Write SBOM if available
 	if len(g.SBOMBytes) > 0 {
-		imageName := g.Spec.Name
-		if imageName == "" {
-			imageName = "dhi-image"
-		}
+		imageName := metadata.GetCleanImageName(g.Spec.Image)
 		sbomPath := path.Join("/opt/docker/sbom", imageName, "sbom.cdx.json")
 		if fileAction == nil {
 			fileAction = buildkitllb.Mkdir(path.Dir(sbomPath), 0755, buildkitllb.WithParents(true))

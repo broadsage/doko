@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/anchore/syft/syft"
 	"github.com/anchore/syft/syft/format"
@@ -13,6 +14,22 @@ import (
 
 	"github.com/broadsage/doko/internal/providers"
 )
+
+// GetCleanImageName parses an OCI image reference and returns a clean brand-prefixed lowercase name (e.g. "bhi-alpine").
+func GetCleanImageName(imageRef string) string {
+	if imageRef == "" {
+		return "bhi-image"
+	}
+	parts := strings.Split(imageRef, "/")
+	baseName := parts[len(parts)-1]
+	if idx := strings.Index(baseName, ":"); idx != -1 {
+		baseName = baseName[:idx]
+	}
+	if idx := strings.Index(baseName, "@"); idx != -1 {
+		baseName = baseName[:idx]
+	}
+	return "bhi-" + strings.ToLower(baseName)
+}
 
 // GenerateSBOM scans a simulated package directory using Syft to generate a CycloneDX JSON SBOM.
 func GenerateSBOM(ctx context.Context, imageName string, resolvedPkgs []providers.Package) ([]byte, error) {
