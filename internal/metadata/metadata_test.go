@@ -81,3 +81,31 @@ func TestSetImageConfig(t *testing.T) {
 		t.Errorf("expected custom annotation, got %q", annotations["custom.annotation"])
 	}
 }
+
+func TestSetImageConfig_SourceDateEpoch(t *testing.T) {
+	t.Setenv("SOURCE_DATE_EPOCH", "1718000000") // 2024-06-10T06:13:20Z
+
+	spec := &config.Spec{
+		Name: "test-image",
+		Dates: map[string]string{
+			"release": "2026-08-07",
+		},
+	}
+
+	result := client.NewResult()
+	err := setImageConfig(spec, result)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	configJSON := result.Metadata["containerimage.config"]
+	var imgConfig map[string]any
+	if err := json.Unmarshal(configJSON, &imgConfig); err != nil {
+		t.Fatalf("failed to unmarshal image config: %v", err)
+	}
+
+	expectedTime := "2024-06-10T06:13:20Z"
+	if imgConfig["created"] != expectedTime {
+		t.Errorf("expected created to be %q, got %q", expectedTime, imgConfig["created"])
+	}
+}

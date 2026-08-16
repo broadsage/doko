@@ -244,6 +244,10 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
+	if val, ok := c.BuildOpts().Opts["build-arg:SOURCE_DATE_EPOCH"]; ok {
+		os.Setenv("SOURCE_DATE_EPOCH", val)
+	}
+
 	gen := dokollb.NewGenerator(spec, c, sbomBytes, sbomSuffix)
 	def, err := gen.Generate(ctx)
 	if err != nil {
