@@ -52,7 +52,7 @@ func attachSBOMAttestation(imageRef string, keyPath string) error {
 		typeId string
 	}{
 		{"sbom.cdx.json", "cyclonedx"},
-		{"sbom.spdx.json", "spdx"},
+		{"sbom.spdx.json", "spdxjson"},
 	}
 
 	var foundSuffix string
@@ -121,5 +121,9 @@ func getCleanBaseName(imageRef string) string {
 	if idx := strings.Index(baseName, "@"); idx != -1 {
 		baseName = baseName[:idx]
 	}
-	return strings.ToLower(baseName)
+	baseName = strings.ToLower(baseName)
+	if strings.HasPrefix(baseName, "bhi-") {
+		baseName = strings.TrimPrefix(baseName, "bhi-")
+	}
+	return baseName
 }
