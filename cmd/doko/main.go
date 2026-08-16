@@ -11,6 +11,7 @@ import (
 
 	"github.com/broadsage/doko/internal/builder"
 	"github.com/broadsage/doko/internal/config"
+	"github.com/broadsage/doko/internal/signature"
 )
 
 func main() {
@@ -35,6 +36,12 @@ func main() {
 		case "lint":
 			if err := runLint(os.Args[2:]); err != nil {
 				fmt.Fprintf(os.Stderr, "Lint Error: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		case "sign":
+			if err := runSign(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Sign Error: %v\n", err)
 				os.Exit(1)
 			}
 			os.Exit(0)
@@ -149,4 +156,27 @@ func runLint(args []string) error {
 		fmt.Println("Success: Config complies with all security policies.")
 	}
 	return nil
+}
+
+func runSign(args []string) error {
+	var imageRef string
+	var keyPath string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--key", "-k":
+			if i+1 < len(args) {
+				keyPath = args[i+1]
+				i++
+			}
+		default:
+			imageRef = args[i]
+		}
+	}
+
+	if imageRef == "" {
+		return fmt.Errorf("missing target image reference to sign. Usage: doko sign <image-ref> [--key <key-path>]")
+	}
+
+	return signature.SignImage(imageRef, keyPath)
 }
