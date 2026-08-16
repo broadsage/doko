@@ -57,6 +57,13 @@ func main() {
 				os.Exit(1)
 			}
 			os.Exit(0)
+		default:
+			exitCode := 0
+			if cmd != "help" && cmd != "-h" && cmd != "--help" {
+				exitCode = 1
+			}
+			showHelp(cmd)
+			os.Exit(exitCode)
 		}
 	}
 
@@ -64,6 +71,26 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "doko: fatal error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func showHelp(cmd string) {
+	if cmd != "" && cmd != "-h" && cmd != "--help" && cmd != "help" {
+		fmt.Fprintf(os.Stderr, "Error: unknown command %q\n\n", cmd)
+	}
+
+	fmt.Println("Doko: Declarative Security-Hardened Container Compiler")
+	fmt.Println("\nUsage:")
+	fmt.Println("  doko [command] [arguments]")
+	fmt.Println("\nAvailable Commands:")
+	fmt.Println("  init [file]          Bootstrap a template doko.yaml spec file (default: doko.yaml)")
+	fmt.Println("  validate [file]      Validate a doko.yaml syntax compliance")
+	fmt.Println("  lint [file]          Audit a spec file against OPA hardening security policies")
+	fmt.Println("  keygen [--out path]  Bootstrap standard Cosign keypair files")
+	fmt.Println("  sign <ref> [--key]   Sign a remote OCI image manifest and attach its SBOM attestation")
+	fmt.Println("  verify <ref> [--key] Validate cryptographic signatures and SBOM attestations of an image")
+	fmt.Println("  version              Show current Doko version")
+	fmt.Println("\nBuildKit Integration:")
+	fmt.Println("  When run without arguments in a BuildKit environment, Doko executes as a gateway builder plugin.")
 }
 
 func runInit(args []string) error {
