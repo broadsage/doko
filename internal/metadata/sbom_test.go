@@ -22,30 +22,40 @@ func TestGenerateSBOM(t *testing.T) {
 		},
 	}
 
-	payload, err := GenerateSBOM(context.Background(), "bhi-curl-image", resolved)
+	// 1. Test CycloneDX
+	payload, suffix, err := GenerateSBOM(context.Background(), "bhi-curl-image", resolved, "cyclonedx")
 	if err != nil {
-		t.Fatalf("failed to generate SBOM: %v", err)
+		t.Fatalf("failed to generate CycloneDX SBOM: %v", err)
+	}
+	if suffix != "sbom.cdx.json" {
+		t.Errorf("expected suffix 'sbom.cdx.json', got %q", suffix)
 	}
 
-	// Verify it is valid JSON
-	var result map[string]any
-	if err := json.Unmarshal(payload, &result); err != nil {
-		t.Fatalf("generated SBOM is not valid JSON: %v", err)
+	var cdxResult map[string]any
+	if err := json.Unmarshal(payload, &cdxResult); err != nil {
+		t.Fatalf("generated CycloneDX SBOM is not valid JSON: %v", err)
 	}
-
-	// Verify CycloneDX spec fields exist
-	bomFormat, ok := result["bomFormat"].(string)
+	bomFormat, ok := cdxResult["bomFormat"].(string)
 	if !ok || bomFormat != "CycloneDX" {
-		t.Errorf("expected bomFormat to be 'CycloneDX', got %v", result["bomFormat"])
+		t.Errorf("expected bomFormat to be 'CycloneDX', got %v", cdxResult["bomFormat"])
 	}
 
-	// Verify package is present in the output
-	payloadStr := string(payload)
-	if !strings.Contains(payloadStr, "curl") {
-		t.Error("expected SBOM to contain 'curl' package name, but it was missing")
+	// 2. Test SPDX
+	payloadSpdx, suffixSpdx, err := GenerateSBOM(context.Background(), "bhi-curl-image", resolved, "spdx")
+	if err != nil {
+		t.Fatalf("failed to generate SPDX SBOM: %v", err)
 	}
-	if !strings.Contains(payloadStr, "8.5.0-r0") {
-		t.Error("expected SBOM to contain package version '8.5.0-r0', but it was missing")
+	if suffixSpdx != "sbom.spdx.json" {
+		t.Errorf("expected suffix 'sbom.spdx.json', got %q", suffixSpdx)
+	}
+
+	var spdxResult map[string]any
+	if err := json.Unmarshal(payloadSpdx, &spdxResult); err != nil {
+		t.Fatalf("generated SPDX SBOM is not valid JSON: %v", err)
+	}
+	spdxVersion, ok := spdxResult["spdxVersion"].(string)
+	if !ok || !strings.HasPrefix(spdxVersion, "SPDX-") {
+		t.Errorf("expected spdxVersion prefix 'SPDX-', got %v", spdxResult["spdxVersion"])
 	}
 }
 

@@ -45,6 +45,12 @@ type Spec struct {
 	Cmd            []string          `yaml:"cmd"         json:"cmd,omitempty"`
 	TimeoutSeconds int               `yaml:"timeout-seconds" json:"timeout-seconds,omitempty"`
 	IgnoreRules    []string          `yaml:"ignore-rules" json:"ignore-rules,omitempty"`
+	SBOM           SBOMConfig        `yaml:"sbom"        json:"sbom,omitempty"`
+}
+
+// SBOMConfig defines options for generating Software Bill of Materials (SBOMs).
+type SBOMConfig struct {
+	Format string `yaml:"format" json:"format,omitempty"`
 }
 
 // OSReleaseConfig defines fields for customizing /etc/os-release inside the image.

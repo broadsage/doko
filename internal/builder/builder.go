@@ -236,15 +236,15 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 
 	// 3.5. Generate Software Bill of Materials (SBOM) via Syft
 	imageName := metadata.GetCleanImageName(spec.Image)
-	sbomBytes, err := metadata.GenerateSBOM(ctx, imageName, resolvedPkgs)
+	sbomBytes, sbomSuffix, err := metadata.GenerateSBOM(ctx, imageName, resolvedPkgs, spec.SBOM.Format)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate SBOM: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "[doko] generated CycloneDX SBOM (%d bytes)\n", len(sbomBytes))
+	fmt.Fprintf(os.Stderr, "[doko] generated SBOM using format %q (%d bytes, file: %s)\n", spec.SBOM.Format, len(sbomBytes), sbomSuffix)
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
-	gen := dokollb.NewGenerator(spec, c, sbomBytes)
+	gen := dokollb.NewGenerator(spec, c, sbomBytes, sbomSuffix)
 	def, err := gen.Generate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("generate LLB definition: %w", err)

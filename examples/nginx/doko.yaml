@@ -35,6 +35,9 @@ annotations:
   org.opencontainers.image.version: "${NGINX_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
 
+sbom:
+  format: spdx
+
 os-release:
   name: Broadsage Secured Images (Alpine)
   id: alpine

@@ -28,19 +28,21 @@ type localAPK struct {
 
 // Generator translates a parsed Doko spec into a BuildKit LLB state.
 type Generator struct {
-	Spec      *config.Spec
-	Client    gwclient.Client
-	localAPKs map[string]localAPK
-	SBOMBytes []byte
+	Spec         *config.Spec
+	Client       gwclient.Client
+	localAPKs    map[string]localAPK
+	SBOMBytes    []byte
+	SBOMFilename string
 }
 
-// NewGenerator creates a new LLB generator from a parsed spec, BuildKit client, and SBOM bytes.
-func NewGenerator(spec *config.Spec, c gwclient.Client, sbomBytes []byte) *Generator {
+// NewGenerator creates a new LLB generator from a parsed spec, BuildKit client, SBOM bytes, and SBOM filename.
+func NewGenerator(spec *config.Spec, c gwclient.Client, sbomBytes []byte, sbomFilename string) *Generator {
 	return &Generator{
-		Spec:      spec,
-		Client:    c,
-		localAPKs: make(map[string]localAPK),
-		SBOMBytes: sbomBytes,
+		Spec:         spec,
+		Client:       c,
+		localAPKs:    make(map[string]localAPK),
+		SBOMBytes:    sbomBytes,
+		SBOMFilename: sbomFilename,
 	}
 }
 
@@ -630,7 +632,11 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 	// 2. Write SBOM if available
 	if len(g.SBOMBytes) > 0 {
 		imageName := metadata.GetCleanImageName(g.Spec.Image)
-		sbomPath := path.Join("/opt/docker/sbom", imageName, "sbom.cdx.json")
+		sbomFilename := g.SBOMFilename
+		if sbomFilename == "" {
+			sbomFilename = "sbom.cdx.json"
+		}
+		sbomPath := path.Join("/opt/docker/sbom", imageName, sbomFilename)
 		if fileAction == nil {
 			fileAction = buildkitllb.Mkdir(path.Dir(sbomPath), 0755, buildkitllb.WithParents(true))
 			fileAction = fileAction.Mkfile(sbomPath, 0644, g.SBOMBytes)
