@@ -42,8 +42,18 @@ check_repo() {
 # Tags it as doko:local for use in demo builds and local testing.
 cmd_build() {
     log_info "Building doko frontend image (linux/${ARCH})..."
+    local version
+    version="$(git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0-dev")"
+    local commit
+    commit="$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+    local build_time
+    build_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
     docker build \
         --platform "linux/${ARCH}" \
+        --build-arg "VERSION=${version}" \
+        --build-arg "COMMIT=${commit}" \
+        --build-arg "BUILD_TIME=${build_time}" \
         --tag "${LOCAL_IMAGE}" \
         --file "${REPO_ROOT}/Dockerfile" \
         "${REPO_ROOT}"
