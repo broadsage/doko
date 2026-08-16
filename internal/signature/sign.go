@@ -127,3 +127,84 @@ func getCleanBaseName(imageRef string) string {
 	}
 	return baseName
 }
+
+// VerifyImage verifies the cryptographic signatures and SBOM attestations of an image.
+func VerifyImage(imageRef string, keyPath string) error {
+	// Verify cosign CLI exists
+	if _, err := exec.LookPath("cosign"); err != nil {
+		return fmt.Errorf("cosign CLI binary not found in PATH: %w", err)
+	}
+
+	// 1. Verify image manifest signature
+	fmt.Printf("[doko] verifying image signature: %s\n", imageRef)
+	verifyArgs := []string{"verify"}
+	if keyPath != "" {
+		verifyArgs = append(verifyArgs, "--key", keyPath)
+	}
+	verifyArgs = append(verifyArgs, imageRef)
+
+	verifyCmd := exec.Command("cosign", verifyArgs...)
+	verifyCmd.Stdout = os.Stdout
+	verifyCmd.Stderr = os.Stderr
+	if err := verifyCmd.Run(); err != nil {
+		return fmt.Errorf("image signature verification failed: %w", err)
+	}
+	fmt.Println("[doko] image signature verified successfully")
+
+	// 2. Verify SBOM attestations (tries both cyclonedx and spdxjson)
+	fmt.Println("[doko] verifying SBOM attestations...")
+	attestations := []string{"cyclonedx", "spdxjson"}
+	var verifyErr error
+
+	for _, t := range attestations {
+		attArgs := []string{"verify-attestation", "--type", t}
+		if keyPath != "" {
+			attArgs = append(attArgs, "--key", keyPath)
+		}
+		attArgs = append(attArgs, imageRef)
+
+		attCmd := exec.Command("cosign", attArgs...)
+		// Run silently for matching check
+		if err := attCmd.Run(); err == nil {
+			fmt.Printf("[doko] found and verified valid %s SBOM attestation\n", t)
+			return nil
+		} else {
+			verifyErr = err
+		}
+	}
+
+	return fmt.Errorf("no verified SBOM attestations found: %w", verifyErr)
+}
+
+// GenerateKeypair creates a public/private Cosign keypair.
+func GenerateKeypair(outPath string) error {
+	if _, err := exec.LookPath("cosign"); err != nil {
+		return fmt.Errorf("cosign CLI binary not found in PATH: %w", err)
+	}
+
+	fmt.Printf("[doko] generating cosign keypair at: %s\n", outPath)
+	cmd := exec.Command("cosign", "generate-key-pair")
+	
+	// If outPath is provided, we can run it in that directory or change output name
+	if outPath != "" {
+		// Cosign generate-key-pair supports writing to custom paths via environment variables or CLI configs,
+		// but key generation by default outputs to cosign.key / cosign.pub.
+		// We can change the Cwd of the cmd to output keys in the desired directory.
+		cmd.Dir = outPath
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	// Ensure password is set via environment variable for automation
+	if os.Getenv("COSIGN_PASSWORD") == "" {
+		cmd.Env = append(os.Environ(), "COSIGN_PASSWORD=")
+		fmt.Println("[doko] COSIGN_PASSWORD env var not set; generating keypair without encryption password")
+	}
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to generate key pair: %w", err)
+	}
+
+	return nil
+}

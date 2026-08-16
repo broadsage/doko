@@ -45,6 +45,18 @@ func main() {
 				os.Exit(1)
 			}
 			os.Exit(0)
+		case "verify":
+			if err := runVerify(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Verify Error: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		case "keygen":
+			if err := runKeygen(os.Args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Keygen Error: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
 		}
 	}
 
@@ -179,4 +191,45 @@ func runSign(args []string) error {
 	}
 
 	return signature.SignImage(imageRef, keyPath)
+}
+
+func runVerify(args []string) error {
+	var imageRef string
+	var keyPath string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--key", "-k":
+			if i+1 < len(args) {
+				keyPath = args[i+1]
+				i++
+			}
+		default:
+			imageRef = args[i]
+		}
+	}
+
+	if imageRef == "" {
+		return fmt.Errorf("missing target image reference to verify. Usage: doko verify <image-ref> [--key <key-path>]")
+	}
+
+	return signature.VerifyImage(imageRef, keyPath)
+}
+
+func runKeygen(args []string) error {
+	var outPath string
+
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--out", "-o":
+			if i+1 < len(args) {
+				outPath = args[i+1]
+				i++
+			}
+		default:
+			return fmt.Errorf("unknown keygen argument: %s. Usage: doko keygen [--out <output-path>]", args[i])
+		}
+	}
+
+	return signature.GenerateKeypair(outPath)
 }

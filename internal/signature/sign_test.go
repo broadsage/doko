@@ -30,3 +30,11 @@ func TestSignImage_FailsOnInvalidImage(t *testing.T) {
 		t.Error("expected error when signing non-existent image, got nil")
 	}
 }
+
+func TestVerifyImage_FailsOnInvalidImage(t *testing.T) {
+	// Assert that it fails cleanly when attempting to verify an invalid image reference
+	err := VerifyImage("non-existent-image:latest", "")
+	if err == nil {
+		t.Error("expected error when verifying non-existent image, got nil")
+	}
+}
