@@ -3,6 +3,7 @@ package metadata
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -75,5 +76,30 @@ func TestGetCleanImageName(t *testing.T) {
 		if got != tc.expected {
 			t.Errorf("GetCleanImageName(%q) = %q; expected %q", tc.input, got, tc.expected)
 		}
+	}
+}
+
+func TestGenerateSBOM_MkdirTempFail(t *testing.T) {
+	oldTmp := os.Getenv("TMPDIR")
+	os.Setenv("TMPDIR", "/non-existent-dir-12345")
+	defer os.Setenv("TMPDIR", oldTmp)
+
+	_, _, err := GenerateSBOM(context.Background(), "bhi-image", nil, "cyclonedx")
+	if err == nil {
+		t.Error("expected error when TMPDIR is invalid, got nil")
+	}
+}
+
+func TestGenerateSBOM_InvalidFormatFallback(t *testing.T) {
+	payload, suffix, err := GenerateSBOM(context.Background(), "bhi-image", nil, "invalid-format")
+	if err != nil {
+		t.Fatalf("expected fallback to succeed, got error: %v", err)
+	}
+	if suffix != "sbom.cdx.json" {
+		t.Errorf("expected suffix to fall back to 'sbom.cdx.json', got %q", suffix)
+	}
+	var cdxResult map[string]any
+	if err := json.Unmarshal(payload, &cdxResult); err != nil {
+		t.Fatalf("fallback payload is not valid JSON: %v", err)
 	}
 }

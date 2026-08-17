@@ -172,3 +172,99 @@ func TestCLICommandsWithMocks(t *testing.T) {
 		}
 	})
 }
+
+func TestRunMain(t *testing.T) {
+	if os.Getenv("GO_RUN_MAIN") == "1" {
+		args := []string{os.Args[0]}
+		for i := 1; i < len(os.Args); i++ {
+			if os.Args[i] == "--" {
+				args = append(args, os.Args[i+1:]...)
+				break
+			}
+		}
+		os.Args = args
+		main()
+		return
+	}
+}
+
+func TestCLIMain_Commands(t *testing.T) {
+	runMainSubprocess := func(args ...string) (string, int) {
+		cmdArgs := append([]string{"-test.run=TestRunMain", "--"}, args...)
+		cmd := exec.Command(os.Args[0], cmdArgs...)
+		cmd.Env = append(os.Environ(), "GO_RUN_MAIN=1")
+		output, err := cmd.CombinedOutput()
+		exitCode := 0
+		if err != nil {
+			if exitError, ok := err.(*exec.ExitError); ok {
+				exitCode = exitError.ExitCode()
+			} else {
+				exitCode = -1
+			}
+		}
+		return string(output), exitCode
+	}
+
+	t.Run("version", func(t *testing.T) {
+		out, code := runMainSubprocess("version")
+		if code != 0 || !strings.Contains(out, "Doko - BuildKit") {
+			t.Errorf("expected version success, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("help", func(t *testing.T) {
+		out, code := runMainSubprocess("help")
+		if code != 0 || !strings.Contains(out, "Available Commands") {
+			t.Errorf("expected help success, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("invalid-cmd", func(t *testing.T) {
+		out, code := runMainSubprocess("invalid-cmd")
+		if code != 1 || !strings.Contains(out, "unknown command") {
+			t.Errorf("expected invalid command to fail, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("init-error", func(t *testing.T) {
+		out, code := runMainSubprocess("init", "/non-existent-dir/doko.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected init failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("validate-error", func(t *testing.T) {
+		out, code := runMainSubprocess("validate", "non-existent.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected validate failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("lint-error", func(t *testing.T) {
+		out, code := runMainSubprocess("lint", "non-existent.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected lint failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("sign-error", func(t *testing.T) {
+		out, code := runMainSubprocess("sign")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected sign failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("verify-error", func(t *testing.T) {
+		out, code := runMainSubprocess("verify")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected verify failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("keygen-error", func(t *testing.T) {
+		out, code := runMainSubprocess("keygen", "--invalid-flag")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected keygen failure, got code %d, output: %s", code, out)
+		}
+	})
+}

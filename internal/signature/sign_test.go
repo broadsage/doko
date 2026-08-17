@@ -148,4 +148,106 @@ func TestSignatureFlows_Success(t *testing.T) {
 			t.Errorf("GenerateKeypair failed: %v", err)
 		}
 	})
+
+	t.Run("SignImage LookPath Fail", func(t *testing.T) {
+		LookPath = func(file string) (string, error) {
+			return "", fmt.Errorf("not found")
+		}
+		defer func() { LookPath = mockLookPath }()
+
+		err := SignImage("test-image:latest", "dummy.key")
+		if err == nil {
+			t.Error("expected error when cosign is missing, got nil")
+		}
+	})
+
+	t.Run("SignImage Exec Fail", func(t *testing.T) {
+		ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "false")
+		}
+		defer func() { ExecCommand = fakeExecCommand }()
+
+		err := SignImage("test-image:latest", "dummy.key")
+		if err == nil {
+			t.Error("expected error when cosign sign command fails, got nil")
+		}
+	})
+
+	t.Run("attachSBOMAttestation docker missing", func(t *testing.T) {
+		LookPath = func(file string) (string, error) {
+			if file == "docker" {
+				return "", fmt.Errorf("docker not found")
+			}
+			return "/usr/bin/" + file, nil
+		}
+		defer func() { LookPath = mockLookPath }()
+
+		err := SignImage("test-image:latest", "dummy.key")
+		if err != nil {
+			t.Errorf("SignImage should succeed even if docker is missing, got: %v", err)
+		}
+	})
+
+	t.Run("attachSBOMAttestation temp dir failure", func(t *testing.T) {
+		ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			if name == "docker" {
+				return exec.CommandContext(ctx, "false")
+			}
+			return exec.CommandContext(ctx, "true")
+		}
+		defer func() { ExecCommand = fakeExecCommand }()
+
+		err := SignImage("test-image:latest", "dummy.key")
+		if err != nil {
+			t.Errorf("SignImage should succeed even if attachSBOM fails, got: %v", err)
+		}
+	})
+
+	t.Run("VerifyImage LookPath Fail", func(t *testing.T) {
+		LookPath = func(file string) (string, error) {
+			return "", fmt.Errorf("not found")
+		}
+		defer func() { LookPath = mockLookPath }()
+
+		err := VerifyImage("test-image:latest", "dummy.key")
+		if err == nil {
+			t.Error("expected error when cosign is missing during verification, got nil")
+		}
+	})
+
+	t.Run("VerifyImage cosign command fails", func(t *testing.T) {
+		ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "false")
+		}
+		defer func() { ExecCommand = fakeExecCommand }()
+
+		err := VerifyImage("test-image:latest", "dummy.key")
+		if err == nil {
+			t.Error("expected verification to fail when cosign command fails, got nil")
+		}
+	})
+
+	t.Run("GenerateKeypair LookPath Fail", func(t *testing.T) {
+		LookPath = func(file string) (string, error) {
+			return "", fmt.Errorf("not found")
+		}
+		defer func() { LookPath = mockLookPath }()
+
+		err := GenerateKeypair(t.TempDir())
+		if err == nil {
+			t.Error("expected error when cosign is missing during keygen, got nil")
+		}
+	})
+
+	t.Run("GenerateKeypair Exec Fail", func(t *testing.T) {
+		ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "false")
+		}
+		defer func() { ExecCommand = fakeExecCommand }()
+
+		err := GenerateKeypair(t.TempDir())
+		if err == nil {
+			t.Error("expected error when cosign keygen fails, got nil")
+		}
+	})
 }

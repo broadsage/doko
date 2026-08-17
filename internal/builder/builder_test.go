@@ -3,6 +3,8 @@ package builder
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/moby/buildkit/client/llb"
@@ -99,5 +101,48 @@ func TestBuild_SuccessAndErrors(t *testing.T) {
 	t.Logf("Build returned error: %v", err)
 	if err == nil {
 		t.Error("expected build to fail eventually during package resolution, but got success")
+	}
+}
+
+func TestFetchCACert(t *testing.T) {
+	ctx := context.Background()
+	hc := &http.Client{}
+
+	// 1. Success case
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("mock-cert-data"))
+	}))
+	defer ts.Close()
+
+	data, err := fetchCACert(ctx, hc, ts.URL)
+	if err != nil {
+		t.Fatalf("fetchCACert failed: %v", err)
+	}
+	if string(data) != "mock-cert-data" {
+		t.Errorf("expected 'mock-cert-data', got %q", string(data))
+	}
+
+	// 2. Status error case
+	tsErr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer tsErr.Close()
+
+	_, err = fetchCACert(ctx, hc, tsErr.URL)
+	if err == nil {
+		t.Fatal("expected error from non-OK status, got nil")
+	}
+
+	// 3. Network error / invalid URL case
+	_, err = fetchCACert(ctx, hc, "http://invalid.local.url/does-not-exist")
+	if err == nil {
+		t.Fatal("expected network error, got nil")
+	}
+
+	// 4. Invalid Request case (bad URL format)
+	_, err = fetchCACert(ctx, hc, "%%")
+	if err == nil {
+		t.Fatal("expected request creation error, got nil")
 	}
 }
