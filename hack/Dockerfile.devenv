@@ -15,6 +15,7 @@ FROM golang:${GO_VERSION}-alpine AS devenv
 ARG GOLANGCI_LINT_VERSION=v2.12.2
 ARG GORELEASER_VERSION=v2.9.0
 ARG BUILDX_VERSION=v0.23.0
+ARG GOFUMPT_VERSION=v0.7.0
 
 # Install system dependencies
 RUN apk add --no-cache \
@@ -66,7 +67,7 @@ RUN set -eux; \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
 
 # Install gofumpt (stricter gofmt, used by the project)
-RUN go install mvdan.cc/gofumpt@latest \
+RUN go install mvdan.cc/gofumpt@${GOFUMPT_VERSION} \
     && mv "$(go env GOPATH)/bin/gofumpt" /usr/local/bin/gofumpt
 
 # Pre-warm the Go module cache using only the module manifest
