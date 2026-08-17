@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -174,6 +175,7 @@ func TestCLICommandsWithMocks(t *testing.T) {
 }
 
 func TestRunMain(t *testing.T) {
+	t.Log("Helper main runner subprocess")
 	if os.Getenv("GO_RUN_MAIN") == "1" {
 		args := []string{os.Args[0]}
 		for i := 1; i < len(os.Args); i++ {
@@ -191,12 +193,13 @@ func TestRunMain(t *testing.T) {
 func TestCLIMain_Commands(t *testing.T) {
 	runMainSubprocess := func(args ...string) (string, int) {
 		cmdArgs := append([]string{"-test.run=TestRunMain", "--"}, args...)
-		cmd := exec.Command(os.Args[0], cmdArgs...)
+		cmd := exec.CommandContext(context.Background(), os.Args[0], cmdArgs...)
 		cmd.Env = append(os.Environ(), "GO_RUN_MAIN=1")
 		output, err := cmd.CombinedOutput()
 		exitCode := 0
 		if err != nil {
-			if exitError, ok := err.(*exec.ExitError); ok {
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
 				exitCode = exitError.ExitCode()
 			} else {
 				exitCode = -1
