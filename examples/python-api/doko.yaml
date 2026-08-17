@@ -15,6 +15,10 @@ dates:
   release: "2026-07-16"
   end-of-life: "2028-10-31"
 
+security:
+  scanner: grype
+  fail-on: critical
+
 vars:
   PYTHON_VERSION: "3.12"
   WORKDIR_PATH: "/app"

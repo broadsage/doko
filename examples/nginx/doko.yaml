@@ -38,6 +38,10 @@ annotations:
 sbom:
   format: spdx
 
+security:
+  scanner: grype
+  fail-on: critical
+
 os-release:
   name: Broadsage Secured Images (Alpine)
   id: alpine

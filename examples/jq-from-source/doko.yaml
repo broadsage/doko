@@ -26,6 +26,10 @@ platforms:
 dates:
   release: "2026-07-30"
 
+security:
+  scanner: grype
+  fail-on: critical
+
 vars:
   JQ_VERSION: "1.7.1"
 
