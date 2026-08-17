@@ -2,6 +2,7 @@ package signature
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -27,7 +28,7 @@ func SignImage(imageRef string, keyPath string) error {
 	// Add signature validation skip prompts/confirmations for CI/non-interactive environments
 	signArgs = append(signArgs, "--yes", imageRef)
 
-	signCmd := exec.Command("cosign", signArgs...)
+	signCmd := exec.CommandContext(context.Background(), "cosign", signArgs...)
 	signCmd.Stdout = os.Stdout
 	signCmd.Stderr = os.Stderr
 	if err := signCmd.Run(); err != nil {
@@ -45,7 +46,7 @@ func SignImage(imageRef string, keyPath string) error {
 
 func attachSBOMAttestation(imageRef string, keyPath string) error {
 	baseName := getCleanBaseName(imageRef)
-	
+
 	// We check for both cdx and spdx formats
 	formats := []struct {
 		suffix string
@@ -66,10 +67,10 @@ func attachSBOMAttestation(imageRef string, keyPath string) error {
 
 	for _, f := range formats {
 		pathInsideImage := fmt.Sprintf("/opt/docker/sbom/bhi-%s/%s", baseName, f.suffix)
-		cmd := exec.Command("docker", "run", "--rm", "--entrypoint", "cat", imageRef, pathInsideImage)
+		cmd := exec.CommandContext(context.Background(), "docker", "run", "--rm", "--entrypoint", "cat", imageRef, pathInsideImage)
 		var out bytes.Buffer
 		cmd.Stdout = &out
-		
+
 		if err := cmd.Run(); err == nil && out.Len() > 0 {
 			sbomContent = out.Bytes()
 			foundSuffix = f.suffix
@@ -101,7 +102,7 @@ func attachSBOMAttestation(imageRef string, keyPath string) error {
 	}
 	attestArgs = append(attestArgs, "--yes", imageRef)
 
-	attestCmd := exec.Command("cosign", attestArgs...)
+	attestCmd := exec.CommandContext(context.Background(), "cosign", attestArgs...)
 	attestCmd.Stdout = os.Stdout
 	attestCmd.Stderr = os.Stderr
 	if err := attestCmd.Run(); err != nil {
@@ -122,9 +123,7 @@ func getCleanBaseName(imageRef string) string {
 		baseName = baseName[:idx]
 	}
 	baseName = strings.ToLower(baseName)
-	if strings.HasPrefix(baseName, "bhi-") {
-		baseName = strings.TrimPrefix(baseName, "bhi-")
-	}
+	baseName, _ = strings.CutPrefix(baseName, "bhi-")
 	return baseName
 }
 
@@ -143,7 +142,7 @@ func VerifyImage(imageRef string, keyPath string) error {
 	}
 	verifyArgs = append(verifyArgs, imageRef)
 
-	verifyCmd := exec.Command("cosign", verifyArgs...)
+	verifyCmd := exec.CommandContext(context.Background(), "cosign", verifyArgs...)
 	verifyCmd.Stdout = os.Stdout
 	verifyCmd.Stderr = os.Stderr
 	if err := verifyCmd.Run(); err != nil {
@@ -163,7 +162,7 @@ func VerifyImage(imageRef string, keyPath string) error {
 		}
 		attArgs = append(attArgs, imageRef)
 
-		attCmd := exec.Command("cosign", attArgs...)
+		attCmd := exec.CommandContext(context.Background(), "cosign", attArgs...)
 		// Run silently for matching check
 		if err := attCmd.Run(); err == nil {
 			fmt.Printf("[doko] found and verified valid %s SBOM attestation\n", t)
@@ -183,8 +182,8 @@ func GenerateKeypair(outPath string) error {
 	}
 
 	fmt.Printf("[doko] generating cosign keypair at: %s\n", outPath)
-	cmd := exec.Command("cosign", "generate-key-pair")
-	
+	cmd := exec.CommandContext(context.Background(), "cosign", "generate-key-pair")
+
 	// If outPath is provided, we can run it in that directory or change output name
 	if outPath != "" {
 		// Cosign generate-key-pair supports writing to custom paths via environment variables or CLI configs,
