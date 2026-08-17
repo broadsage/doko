@@ -2,11 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/broadsage/doko/internal/signature"
 )
 
 func TestRunInitAndValidate(t *testing.T) {
@@ -88,4 +93,181 @@ func TestShowVersion(t *testing.T) {
 	if !strings.Contains(output, "Doko - BuildKit Image Orchestrator") {
 		t.Errorf("unexpected showVersion output: %q", output)
 	}
+}
+
+func TestShowHelp(t *testing.T) {
+	t.Log("Testing showHelp")
+	old := os.Stdout
+	_, w, _ := os.Pipe()
+	os.Stdout = w
+
+	showHelp("help")
+	showHelp("invalid")
+
+	w.Close()
+	os.Stdout = old
+}
+
+func TestRunLint(t *testing.T) {
+	t.Log("Testing runLint with non-existent file")
+	err := runLint([]string{"non-existent.yaml"})
+	if err == nil {
+		t.Error("expected runLint to fail for non-existent file, got nil")
+	}
+}
+
+func TestCLICommandsWithMocks(t *testing.T) {
+	oldExec := signature.ExecCommand
+	oldLookPath := signature.LookPath
+	defer func() {
+		signature.ExecCommand = oldExec
+		signature.LookPath = oldLookPath
+	}()
+
+	signature.LookPath = func(file string) (string, error) {
+		return "/usr/bin/" + file, nil
+	}
+	signature.ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "echo")
+	}
+
+	t.Run("runKeygen Success", func(t *testing.T) {
+		err := runKeygen([]string{"--out", t.TempDir()})
+		if err != nil {
+			t.Errorf("runKeygen failed: %v", err)
+		}
+	})
+
+	t.Run("runKeygen Invalid Arg", func(t *testing.T) {
+		err := runKeygen([]string{"--invalid-flag"})
+		if err == nil {
+			t.Error("expected runKeygen to fail on invalid arg, got nil")
+		}
+	})
+
+	t.Run("runSign Success", func(t *testing.T) {
+		err := runSign([]string{"test-image:latest", "--key", "dummy.key"})
+		if err != nil {
+			t.Errorf("runSign failed: %v", err)
+		}
+	})
+
+	t.Run("runSign Missing Arg", func(t *testing.T) {
+		err := runSign([]string{})
+		if err == nil {
+			t.Error("expected runSign to fail without arguments, got nil")
+		}
+	})
+
+	t.Run("runVerify Success", func(t *testing.T) {
+		err := runVerify([]string{"test-image:latest", "--key", "dummy.key"})
+		if err != nil {
+			t.Errorf("runVerify failed: %v", err)
+		}
+	})
+
+	t.Run("runVerify Missing Arg", func(t *testing.T) {
+		err := runVerify([]string{})
+		if err == nil {
+			t.Error("expected runVerify to fail without arguments, got nil")
+		}
+	})
+}
+
+func TestRunMain(t *testing.T) {
+	t.Log("Helper main runner subprocess")
+	if os.Getenv("GO_RUN_MAIN") == "1" {
+		args := []string{os.Args[0]}
+		for i := 1; i < len(os.Args); i++ {
+			if os.Args[i] == "--" {
+				args = append(args, os.Args[i+1:]...)
+				break
+			}
+		}
+		os.Args = args
+		main()
+		return
+	}
+}
+
+func TestCLIMain_Commands(t *testing.T) {
+	runMainSubprocess := func(args ...string) (string, int) {
+		cmdArgs := append([]string{"-test.run=TestRunMain", "--"}, args...)
+		cmd := exec.CommandContext(context.Background(), os.Args[0], cmdArgs...)
+		cmd.Env = append(os.Environ(), "GO_RUN_MAIN=1")
+		output, err := cmd.CombinedOutput()
+		exitCode := 0
+		if err != nil {
+			var exitError *exec.ExitError
+			if errors.As(err, &exitError) {
+				exitCode = exitError.ExitCode()
+			} else {
+				exitCode = -1
+			}
+		}
+		return string(output), exitCode
+	}
+
+	t.Run("version", func(t *testing.T) {
+		out, code := runMainSubprocess("version")
+		if code != 0 || !strings.Contains(out, "Doko - BuildKit") {
+			t.Errorf("expected version success, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("help", func(t *testing.T) {
+		out, code := runMainSubprocess("help")
+		if code != 0 || !strings.Contains(out, "Available Commands") {
+			t.Errorf("expected help success, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("invalid-cmd", func(t *testing.T) {
+		out, code := runMainSubprocess("invalid-cmd")
+		if code != 1 || !strings.Contains(out, "unknown command") {
+			t.Errorf("expected invalid command to fail, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("init-error", func(t *testing.T) {
+		out, code := runMainSubprocess("init", "/non-existent-dir/doko.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected init failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("validate-error", func(t *testing.T) {
+		out, code := runMainSubprocess("validate", "non-existent.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected validate failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("lint-error", func(t *testing.T) {
+		out, code := runMainSubprocess("lint", "non-existent.yaml")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected lint failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("sign-error", func(t *testing.T) {
+		out, code := runMainSubprocess("sign")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected sign failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("verify-error", func(t *testing.T) {
+		out, code := runMainSubprocess("verify")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected verify failure, got code %d, output: %s", code, out)
+		}
+	})
+
+	t.Run("keygen-error", func(t *testing.T) {
+		out, code := runMainSubprocess("keygen", "--invalid-flag")
+		if code != 1 || !strings.Contains(out, "Error:") {
+			t.Errorf("expected keygen failure, got code %d, output: %s", code, out)
+		}
+	})
 }

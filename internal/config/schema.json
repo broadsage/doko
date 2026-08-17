@@ -641,6 +641,24 @@
     },
     "timeout-seconds": {
       "type": "integer"
+    },
+    "ignore-rules": {
+      "type": [
+        "null",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "sbom": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#",

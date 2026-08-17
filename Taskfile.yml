@@ -18,8 +18,15 @@ tasks:
   build:
     desc: Compile the doko binary locally
     deps: [generate]
+    vars:
+      VERSION:
+        sh: git describe --tags --always --dirty 2>/dev/null || echo "v1.0.0-dev"
+      COMMIT:
+        sh: git rev-parse --short HEAD 2>/dev/null || echo "unknown"
+      BUILD_TIME:
+        sh: date -u +%Y-%m-%dT%H:%M:%SZ
     cmds:
-      - go build -o ./doko ./cmd/doko/
+      - go build -ldflags "-X main.version={{.VERSION}} -X main.commit={{.COMMIT}} -X main.buildTime={{.BUILD_TIME}}" -o ./doko ./cmd/doko/
 
   test:
     desc: Run the Go package test suite
@@ -97,7 +104,7 @@ tasks:
     cmds:
       - ./hack/make-image.sh test {{.pkg}}
     vars:
-      pkg: nginx
+      pkg: '{{.pkg | default "nginx"}}'
 
   clean:
     desc: Remove local binaries and build files

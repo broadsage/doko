@@ -35,6 +35,9 @@ annotations:
   org.opencontainers.image.version: "${NGINX_VERSION}"
   org.opencontainers.image.authors: "Broadsage Corporation <opensource@broadsage.com>"
 
+sbom:
+  format: spdx
+
 os-release:
   name: Broadsage Secured Images (Alpine)
   id: alpine
@@ -106,6 +109,12 @@ contents:
       runs: |
         ln -sf /dev/stdout /var/log/nginx/access.log
         ln -sf /dev/stderr /var/log/nginx/error.log
+    - name: fix-nginx-permissions
+      runs: |
+        chown -R nonroot:nonroot /var/lib/nginx
+        chown -R nonroot:nonroot /var/log/nginx
+        chown -R nonroot:nonroot /run/nginx
+        sed -i 's/user nginx;/# user nginx;/' /etc/nginx/nginx.conf
 
 entrypoint: ["nginx", "-g", "daemon off;"]
 

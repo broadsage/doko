@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	ocispecs "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/broadsage/doko/internal/config"
+	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/providers"
 	"github.com/broadsage/doko/internal/utils"
 )
@@ -26,17 +28,21 @@ type localAPK struct {
 
 // Generator translates a parsed Doko spec into a BuildKit LLB state.
 type Generator struct {
-	Spec      *config.Spec
-	Client    gwclient.Client
-	localAPKs map[string]localAPK
+	Spec         *config.Spec
+	Client       gwclient.Client
+	localAPKs    map[string]localAPK
+	SBOMBytes    []byte
+	SBOMFilename string
 }
 
-// NewGenerator creates a new LLB generator from a parsed spec and BuildKit client.
-func NewGenerator(spec *config.Spec, c gwclient.Client) *Generator {
+// NewGenerator creates a new LLB generator from a parsed spec, BuildKit client, SBOM bytes, and SBOM filename.
+func NewGenerator(spec *config.Spec, c gwclient.Client, sbomBytes []byte, sbomFilename string) *Generator {
 	return &Generator{
-		Spec:      spec,
-		Client:    c,
-		localAPKs: make(map[string]localAPK),
+		Spec:         spec,
+		Client:       c,
+		localAPKs:    make(map[string]localAPK),
+		SBOMBytes:    sbomBytes,
+		SBOMFilename: sbomFilename,
 	}
 }
 
@@ -621,6 +627,23 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 		}
 
 		fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
+	}
+
+	// 2. Write SBOM if available
+	if len(g.SBOMBytes) > 0 {
+		imageName := metadata.GetCleanImageName(g.Spec.Image)
+		sbomFilename := g.SBOMFilename
+		if sbomFilename == "" {
+			sbomFilename = "sbom.cdx.json"
+		}
+		sbomPath := path.Join("/opt/docker/sbom", imageName, sbomFilename)
+		if fileAction == nil {
+			fileAction = buildkitllb.Mkdir(path.Dir(sbomPath), 0755, buildkitllb.WithParents(true))
+			fileAction = fileAction.Mkfile(sbomPath, 0644, g.SBOMBytes)
+		} else {
+			fileAction = fileAction.Mkdir(path.Dir(sbomPath), 0755, buildkitllb.WithParents(true))
+			fileAction = fileAction.Mkfile(sbomPath, 0644, g.SBOMBytes)
+		}
 	}
 
 	if fileAction != nil {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,7 +135,11 @@ func setImageConfig(spec *config.Spec, result *client.Result) error {
 	imgConfig["architecture"] = arch
 
 	// Populate top-level created timestamp (RFC3339) and author fields for OCI spec compliance
-	if release, ok := spec.Dates["release"]; ok {
+	if epochVal := os.Getenv("SOURCE_DATE_EPOCH"); epochVal != "" {
+		if sec, err := strconv.ParseInt(epochVal, 10, 64); err == nil {
+			imgConfig["created"] = time.Unix(sec, 0).UTC().Format(time.RFC3339)
+		}
+	} else if release, ok := spec.Dates["release"]; ok {
 		if t, err := time.Parse("2006-01-02", release); err == nil {
 			imgConfig["created"] = t.Format(time.RFC3339)
 		} else {

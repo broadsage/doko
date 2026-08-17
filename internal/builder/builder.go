@@ -45,6 +45,25 @@ func Build(ctx context.Context, c client.Client) (*client.Result, error) {
 		return nil, fmt.Errorf("failed to parse doko config: %w", err)
 	}
 
+	// 3.1 Run OPA security hardening policies
+	lintResult, err := config.Lint(ctx, spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lint configuration: %w", err)
+	}
+
+	// Emit warnings to stderr (non-blocking)
+	for _, w := range lintResult.Warnings {
+		fmt.Fprintf(os.Stderr, "doko: [Warning] %s\n", w)
+	}
+
+	// Abort build if critical errors exist
+	if len(lintResult.Errors) > 0 {
+		for _, e := range lintResult.Errors {
+			fmt.Fprintf(os.Stderr, "doko: [Error] %s\n", e)
+		}
+		return nil, fmt.Errorf("doko: build aborted due to %d security policy violation(s)", len(lintResult.Errors))
+	}
+
 	// 3.5 Parse build arguments from client options and merge into spec.Vars
 	buildOpts := c.BuildOpts()
 	for k, v := range buildOpts.Opts {
@@ -215,9 +234,21 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		}
 	}
 
+	// 3.5. Generate Software Bill of Materials (SBOM) via Syft
+	imageName := metadata.GetCleanImageName(spec.Image)
+	sbomBytes, sbomSuffix, err := metadata.GenerateSBOM(ctx, imageName, resolvedPkgs, spec.SBOM.Format)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate SBOM: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "[doko] generated SBOM using format %q (%d bytes, file: %s)\n", spec.SBOM.Format, len(sbomBytes), sbomSuffix)
+
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
-	gen := dokollb.NewGenerator(spec, c)
+	if val, ok := c.BuildOpts().Opts["build-arg:SOURCE_DATE_EPOCH"]; ok {
+		os.Setenv("SOURCE_DATE_EPOCH", val)
+	}
+
+	gen := dokollb.NewGenerator(spec, c, sbomBytes, sbomSuffix)
 	def, err := gen.Generate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("generate LLB definition: %w", err)
