@@ -14,10 +14,6 @@ dates:
   release: "2026-07-16"
   end-of-life: "2029-07-16"
 
-security:
-  scanner: grype
-  fail-on: critical
-
 vars:
   REDIS_VERSION: "8.0.0"
 

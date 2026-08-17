@@ -14,10 +14,6 @@ dates:
   release: "2026-07-16"
   end-of-life: "2031-07-16"
 
-security:
-  scanner: grype
-  fail-on: critical
-
 vars:
   PG_VERSION: "18.0"
   PGDATA: "/var/lib/postgresql/data"

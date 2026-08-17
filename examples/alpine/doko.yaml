@@ -12,10 +12,6 @@ platforms:
 dates:
   release: "2026-06-09"
   end-of-life: "2028-06-01"
-
-security:
-  scanner: grype
-  fail-on: critical
 vars:
   APK_MAJOR_MINOR_VERSION: "1.38"
   APK_MAJOR_VERSION: "1"

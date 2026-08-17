@@ -46,20 +46,11 @@ type Spec struct {
 	TimeoutSeconds int               `yaml:"timeout-seconds" json:"timeout-seconds,omitempty"`
 	IgnoreRules    []string          `yaml:"ignore-rules" json:"ignore-rules,omitempty"`
 	SBOM           SBOMConfig        `yaml:"sbom"        json:"sbom,omitempty"`
-	Security       SecurityConfig    `yaml:"security"    json:"security,omitempty"`
 }
 
 // SBOMConfig defines options for generating Software Bill of Materials (SBOMs).
 type SBOMConfig struct {
 	Format string `yaml:"format" json:"format,omitempty"`
-}
-
-// SecurityConfig defines options for image vulnerability scanning.
-type SecurityConfig struct {
-	Scanner    string   `yaml:"scanner"     json:"scanner,omitempty"`
-	FailOn     string   `yaml:"fail-on"     json:"fail-on,omitempty"`
-	IgnoreCVEs []string `yaml:"ignore-cves" json:"ignore-cves,omitempty"`
-	Attest     *bool    `yaml:"attest"      json:"attest,omitempty"`
 }
 
 // OSReleaseConfig defines fields for customizing /etc/os-release inside the image.
