@@ -18,6 +18,7 @@ import (
 	"github.com/broadsage/doko/internal/metadata"
 	"github.com/broadsage/doko/internal/providers"
 	_ "github.com/broadsage/doko/internal/providers/apk"
+	"github.com/broadsage/doko/internal/security"
 
 	"github.com/moby/buildkit/frontend/dockerui"
 	"github.com/moby/buildkit/frontend/gateway/client"
@@ -241,6 +242,11 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		return nil, fmt.Errorf("failed to generate SBOM: %w", err)
 	}
 	fmt.Fprintf(os.Stderr, "[doko] generated SBOM using format %q (%d bytes, file: %s)\n", spec.SBOM.Format, len(sbomBytes), sbomSuffix)
+
+	// 3.6. Run vulnerability scan if configured
+	if err := security.ScanSBOM(sbomBytes, spec.Security); err != nil {
+		return nil, err
+	}
 
 	// 4. Generate LLB definition.
 	fmt.Fprintf(os.Stderr, "[doko] step 4: generating LLB definition\n")
