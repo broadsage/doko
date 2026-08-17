@@ -20,15 +20,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go build -ldflags "-X main.version=$VERSION -X main.commit=$COMMIT -X main.buildTime=$BUILD_TIME" -o /doko ./cmd/doko
 
 RUN mkdir -p /tmp && chmod 1777 /tmp
-RUN apk add --no-cache curl && \
-    curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
 
-# Final stage: minimal image with only the frontend binary and scanner
-FROM alpine:3.20
+# Final stage: minimal image with only the frontend binary
+FROM scratch
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /tmp /tmp
-COPY --from=builder /usr/local/bin/grype /bin/grype
 COPY --from=builder /doko /bin/doko
 
 ENTRYPOINT ["/bin/doko"]
