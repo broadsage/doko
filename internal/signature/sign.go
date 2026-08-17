@@ -10,10 +10,15 @@ import (
 	"strings"
 )
 
+var (
+	ExecCommand = exec.CommandContext
+	LookPath    = exec.LookPath
+)
+
 // SignImage invokes the cosign CLI to sign the specified remote image and attach any SBOM attestations.
 func SignImage(imageRef string, keyPath string) error {
 	// 1. Verify cosign CLI exists
-	if _, err := exec.LookPath("cosign"); err != nil {
+	if _, err := LookPath("cosign"); err != nil {
 		return fmt.Errorf("cosign CLI binary not found in PATH. Please install cosign: https://github.com/sigstore/cosign")
 	}
 
@@ -28,7 +33,7 @@ func SignImage(imageRef string, keyPath string) error {
 	// Add signature validation skip prompts/confirmations for CI/non-interactive environments
 	signArgs = append(signArgs, "--yes", imageRef)
 
-	signCmd := exec.CommandContext(context.Background(), "cosign", signArgs...)
+	signCmd := ExecCommand(context.Background(), "cosign", signArgs...)
 	signCmd.Stdout = os.Stdout
 	signCmd.Stderr = os.Stderr
 	if err := signCmd.Run(); err != nil {
@@ -61,13 +66,13 @@ func attachSBOMAttestation(imageRef string, keyPath string) error {
 	var sbomContent []byte
 
 	// Check if docker CLI is available to extract the SBOM
-	if _, err := exec.LookPath("docker"); err != nil {
+	if _, err := LookPath("docker"); err != nil {
 		return fmt.Errorf("docker CLI binary not found, skipping SBOM attestation extraction")
 	}
 
 	for _, f := range formats {
 		pathInsideImage := fmt.Sprintf("/opt/docker/sbom/bhi-%s/%s", baseName, f.suffix)
-		cmd := exec.CommandContext(context.Background(), "docker", "run", "--rm", "--entrypoint", "cat", imageRef, pathInsideImage)
+		cmd := ExecCommand(context.Background(), "docker", "run", "--rm", "--entrypoint", "cat", imageRef, pathInsideImage)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 
@@ -102,7 +107,7 @@ func attachSBOMAttestation(imageRef string, keyPath string) error {
 	}
 	attestArgs = append(attestArgs, "--yes", imageRef)
 
-	attestCmd := exec.CommandContext(context.Background(), "cosign", attestArgs...)
+	attestCmd := ExecCommand(context.Background(), "cosign", attestArgs...)
 	attestCmd.Stdout = os.Stdout
 	attestCmd.Stderr = os.Stderr
 	if err := attestCmd.Run(); err != nil {
@@ -130,7 +135,7 @@ func getCleanBaseName(imageRef string) string {
 // VerifyImage verifies the cryptographic signatures and SBOM attestations of an image.
 func VerifyImage(imageRef string, keyPath string) error {
 	// Verify cosign CLI exists
-	if _, err := exec.LookPath("cosign"); err != nil {
+	if _, err := LookPath("cosign"); err != nil {
 		return fmt.Errorf("cosign CLI binary not found in PATH: %w", err)
 	}
 
@@ -142,7 +147,7 @@ func VerifyImage(imageRef string, keyPath string) error {
 	}
 	verifyArgs = append(verifyArgs, imageRef)
 
-	verifyCmd := exec.CommandContext(context.Background(), "cosign", verifyArgs...)
+	verifyCmd := ExecCommand(context.Background(), "cosign", verifyArgs...)
 	verifyCmd.Stdout = os.Stdout
 	verifyCmd.Stderr = os.Stderr
 	if err := verifyCmd.Run(); err != nil {
@@ -162,7 +167,7 @@ func VerifyImage(imageRef string, keyPath string) error {
 		}
 		attArgs = append(attArgs, imageRef)
 
-		attCmd := exec.CommandContext(context.Background(), "cosign", attArgs...)
+		attCmd := ExecCommand(context.Background(), "cosign", attArgs...)
 		// Run silently for matching check
 		if err := attCmd.Run(); err == nil {
 			fmt.Printf("[doko] found and verified valid %s SBOM attestation\n", t)
@@ -177,12 +182,12 @@ func VerifyImage(imageRef string, keyPath string) error {
 
 // GenerateKeypair creates a public/private Cosign keypair.
 func GenerateKeypair(outPath string) error {
-	if _, err := exec.LookPath("cosign"); err != nil {
+	if _, err := LookPath("cosign"); err != nil {
 		return fmt.Errorf("cosign CLI binary not found in PATH: %w", err)
 	}
 
 	fmt.Printf("[doko] generating cosign keypair at: %s\n", outPath)
-	cmd := exec.CommandContext(context.Background(), "cosign", "generate-key-pair")
+	cmd := ExecCommand(context.Background(), "cosign", "generate-key-pair")
 
 	// If outPath is provided, we can run it in that directory or change output name
 	if outPath != "" {

@@ -2,11 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/broadsage/doko/internal/signature"
 )
 
 func TestRunInitAndValidate(t *testing.T) {
@@ -88,4 +92,83 @@ func TestShowVersion(t *testing.T) {
 	if !strings.Contains(output, "Doko - BuildKit Image Orchestrator") {
 		t.Errorf("unexpected showVersion output: %q", output)
 	}
+}
+
+func TestShowHelp(t *testing.T) {
+	t.Log("Testing showHelp")
+	old := os.Stdout
+	_, w, _ := os.Pipe()
+	os.Stdout = w
+
+	showHelp("help")
+	showHelp("invalid")
+
+	w.Close()
+	os.Stdout = old
+}
+
+func TestRunLint(t *testing.T) {
+	t.Log("Testing runLint with non-existent file")
+	err := runLint([]string{"non-existent.yaml"})
+	if err == nil {
+		t.Error("expected runLint to fail for non-existent file, got nil")
+	}
+}
+
+func TestCLICommandsWithMocks(t *testing.T) {
+	oldExec := signature.ExecCommand
+	oldLookPath := signature.LookPath
+	defer func() {
+		signature.ExecCommand = oldExec
+		signature.LookPath = oldLookPath
+	}()
+
+	signature.LookPath = func(file string) (string, error) {
+		return "/usr/bin/" + file, nil
+	}
+	signature.ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "echo")
+	}
+
+	t.Run("runKeygen Success", func(t *testing.T) {
+		err := runKeygen([]string{"--out", t.TempDir()})
+		if err != nil {
+			t.Errorf("runKeygen failed: %v", err)
+		}
+	})
+
+	t.Run("runKeygen Invalid Arg", func(t *testing.T) {
+		err := runKeygen([]string{"--invalid-flag"})
+		if err == nil {
+			t.Error("expected runKeygen to fail on invalid arg, got nil")
+		}
+	})
+
+	t.Run("runSign Success", func(t *testing.T) {
+		err := runSign([]string{"test-image:latest", "--key", "dummy.key"})
+		if err != nil {
+			t.Errorf("runSign failed: %v", err)
+		}
+	})
+
+	t.Run("runSign Missing Arg", func(t *testing.T) {
+		err := runSign([]string{})
+		if err == nil {
+			t.Error("expected runSign to fail without arguments, got nil")
+		}
+	})
+
+	t.Run("runVerify Success", func(t *testing.T) {
+		err := runVerify([]string{"test-image:latest", "--key", "dummy.key"})
+		if err != nil {
+			t.Errorf("runVerify failed: %v", err)
+		}
+	})
+
+	t.Run("runVerify Missing Arg", func(t *testing.T) {
+		err := runVerify([]string{})
+		if err == nil {
+			t.Error("expected runVerify to fail without arguments, got nil")
+		}
+	})
 }
