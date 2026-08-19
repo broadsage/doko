@@ -11,7 +11,6 @@ import (
 
 	"github.com/broadsage/doko/internal/builder"
 	"github.com/broadsage/doko/internal/config"
-	"github.com/broadsage/doko/internal/signature"
 )
 
 func main() {
@@ -39,24 +38,7 @@ func main() {
 				os.Exit(1)
 			}
 			os.Exit(0)
-		case "sign":
-			if err := runSign(os.Args[2:]); err != nil {
-				fmt.Fprintf(os.Stderr, "Sign Error: %v\n", err)
-				os.Exit(1)
-			}
-			os.Exit(0)
-		case "verify":
-			if err := runVerify(os.Args[2:]); err != nil {
-				fmt.Fprintf(os.Stderr, "Verify Error: %v\n", err)
-				os.Exit(1)
-			}
-			os.Exit(0)
-		case "keygen":
-			if err := runKeygen(os.Args[2:]); err != nil {
-				fmt.Fprintf(os.Stderr, "Keygen Error: %v\n", err)
-				os.Exit(1)
-			}
-			os.Exit(0)
+
 		default:
 			exitCode := 0
 			if cmd != "help" && cmd != "-h" && cmd != "--help" {
@@ -85,9 +67,6 @@ func showHelp(cmd string) {
 	fmt.Println("  init [file]          Bootstrap a template doko.yaml spec file (default: doko.yaml)")
 	fmt.Println("  validate [file]      Validate a doko.yaml syntax compliance")
 	fmt.Println("  lint [file]          Audit a spec file against OPA hardening security policies")
-	fmt.Println("  keygen [--out path]  Bootstrap standard Cosign keypair files")
-	fmt.Println("  sign <ref> [--key]   Sign a remote OCI image manifest and attach its SBOM attestation")
-	fmt.Println("  verify <ref> [--key] Validate cryptographic signatures and SBOM attestations of an image")
 	fmt.Println("  version              Show current Doko version")
 	fmt.Println("\nBuildKit Integration:")
 	fmt.Println("  When run without arguments in a BuildKit environment, Doko executes as a gateway builder plugin.")
@@ -197,66 +176,3 @@ func runLint(args []string) error {
 	return nil
 }
 
-func runSign(args []string) error {
-	var imageRef string
-	var keyPath string
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--key", "-k":
-			if i+1 < len(args) {
-				keyPath = args[i+1]
-				i++
-			}
-		default:
-			imageRef = args[i]
-		}
-	}
-
-	if imageRef == "" {
-		return fmt.Errorf("missing target image reference to sign. Usage: doko sign <image-ref> [--key <key-path>]")
-	}
-
-	return signature.SignImage(imageRef, keyPath)
-}
-
-func runVerify(args []string) error {
-	var imageRef string
-	var keyPath string
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--key", "-k":
-			if i+1 < len(args) {
-				keyPath = args[i+1]
-				i++
-			}
-		default:
-			imageRef = args[i]
-		}
-	}
-
-	if imageRef == "" {
-		return fmt.Errorf("missing target image reference to verify. Usage: doko verify <image-ref> [--key <key-path>]")
-	}
-
-	return signature.VerifyImage(imageRef, keyPath)
-}
-
-func runKeygen(args []string) error {
-	var outPath string
-
-	for i := 0; i < len(args); i++ {
-		switch args[i] {
-		case "--out", "-o":
-			if i+1 < len(args) {
-				outPath = args[i+1]
-				i++
-			}
-		default:
-			return fmt.Errorf("unknown keygen argument: %s. Usage: doko keygen [--out <output-path>]", args[i])
-		}
-	}
-
-	return signature.GenerateKeypair(outPath)
-}

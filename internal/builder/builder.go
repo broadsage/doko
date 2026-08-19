@@ -248,7 +248,7 @@ func buildPlatformResult(ctx context.Context, c client.Client, spec *config.Spec
 		os.Setenv("SOURCE_DATE_EPOCH", val)
 	}
 
-	gen := dokollb.NewGenerator(spec, c, sbomBytes, sbomSuffix)
+	gen := dokollb.NewGenerator(spec, c)
 	def, err := gen.Generate(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("generate LLB definition: %w", err)
