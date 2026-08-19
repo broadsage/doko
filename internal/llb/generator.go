@@ -623,8 +623,6 @@ func (g *Generator) writeMetadataFiles(state buildkitllb.State) buildkitllb.Stat
 		fileAction = buildkitllb.Mkfile("/etc/os-release", 0o644, []byte(sb.String()))
 	}
 
-
-
 	if fileAction != nil {
 		state = state.File(fileAction, buildkitllb.WithCustomName("add metadata"))
 	}

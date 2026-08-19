@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
 )
 
 func TestRunInitAndValidate(t *testing.T) {
@@ -115,8 +114,6 @@ func TestRunLint(t *testing.T) {
 	}
 }
 
-
-
 func TestRunMain(t *testing.T) {
 	t.Log("Helper main runner subprocess")
 	if os.Getenv("GO_RUN_MAIN") == "1" {
@@ -192,6 +189,4 @@ func TestCLIMain_Commands(t *testing.T) {
 			t.Errorf("expected lint failure, got code %d, output: %s", code, out)
 		}
 	})
-
-
 }
