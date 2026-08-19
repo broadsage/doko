@@ -1,76 +1,89 @@
 # Security Policy
 
+We take the security of Doko seriously. If you believe you have found a security vulnerability, please report it to us using the instructions below.
+
+---
+
 ## Supported Versions
 
-Only the latest release of Doko receives security fixes. We do not backport patches to older versions.
+Security fixes are actively applied to the latest release of Doko. We do not backport patches to older minor or major versions unless explicitly specified.
 
 | Version | Supported |
-| ------- | --------- |
-| Latest  | ✅        |
-| Older   | ❌        |
+| :--- | :---: |
+| Latest Release | ✅ Yes |
+| All Older Versions | ❌ No |
+
+---
 
 ## Reporting a Vulnerability
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+> [!IMPORTANT]
+> **Please do not report security vulnerabilities through public GitHub issues, pull requests, or public discussions.**
 
 If you discover a security vulnerability, please report it privately using one of the following methods:
 
-### GitHub Private Vulnerability Reporting (preferred)
-
-Use GitHub's built-in private vulnerability reporting:
-
-1. Go to the [Security tab](https://github.com/broadsage/doko/security) of this repository.
+### 1. GitHub Private Vulnerability Reporting (Preferred)
+GitHub provides a secure, private channel to report vulnerabilities directly to the maintainers:
+1. Navigate to the [Doko Security Tab](https://github.com/broadsage/doko/security) on GitHub.
 2. Click **"Report a vulnerability"**.
-3. Fill in the details and submit.
+3. Complete the form with details, including reproduction steps or a proof-of-concept, and click submit.
 
-We will receive a private notification and respond within **5 business days**.
+This keeps the discussion entirely private between you and the project maintainers until a patch is released.
 
-### Email
+### 2. Email
+If you prefer not to use GitHub's interface, you can report vulnerabilities via email. Send details to the security contact listed on the [Broadsage GitHub Organization Page](https://github.com/broadsage).
 
-If you prefer email, send details to the maintainers via the contact listed on the [Broadsage GitHub Organisation](https://github.com/broadsage).
+When reporting, please include:
+- A detailed description of the vulnerability and its potential impact.
+- Step-by-step instructions to reproduce the issue (including any config specs or commands).
+- The exact version of Doko and the BuildKit environment you are running.
+- Any proposed mitigations or fix implementations (optional).
 
-Please include:
+---
 
-- A description of the vulnerability and its potential impact
-- Steps to reproduce or a proof-of-concept
-- The affected version(s)
-- Any suggested mitigations (optional)
+## Response & Disclosure Process
 
-## Response Process
+We follow a coordinated disclosure model. Once a report is submitted, we will:
 
-1. **Acknowledgement** — we will acknowledge receipt within 5 business days.
-2. **Assessment** — we will assess severity and scope, and communicate a timeline.
-3. **Fix & disclosure** — a patch will be prepared and released. We follow [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vulnerability_disclosure): we will notify you before publishing and credit you in the release notes unless you prefer to remain anonymous.
-4. **CVE** — for significant vulnerabilities we will request a CVE via GitHub's advisory system.
+1. **Acknowledgement**: Acknowledge receipt of your report within **48 hours (2 business days)**.
+2. **Validation & Assessment**: Investigate the report to verify the vulnerability and determine its severity. We will keep you updated on our progress.
+3. **Remediation**: Prepare a security patch in a private fork.
+4. **Coordinated Release**: Release the patch in a new version of Doko. We will coordinate the release date with you and credit you in the release notes unless you prefer to remain anonymous.
+5. **CVE Assignment**: Request a CVE identifier through the GitHub Advisory Database for significant vulnerabilities.
+
+---
 
 ## Scope
 
-The following are **in scope**:
+### In Scope
+- The `doko` binary CLI and the Go packages under `internal/` and `cmd/`.
+- The official BuildKit frontend images published at `ghcr.io/broadsage/doko`.
+- The repository build configurations (`Dockerfile` and `Dockerfile.goreleaser`).
+- The project CI/CD workflows (`.github/workflows`).
 
-- The `doko` binary and its Go packages under `internal/` and `cmd/`
-- The `Dockerfile` and `Dockerfile.goreleaser` build images
-- The published OCI images at `ghcr.io/broadsage/doko`
-- The CI/CD workflows (supply-chain attacks, secret leakage, etc.)
+### Out of Scope
+- Known public vulnerabilities in upstream dependencies (e.g., BuildKit or Go libraries) — please report these to the respective upstream maintainers.
+- Unofficial third-party builds, forks, or packaging scripts.
 
-The following are **out of scope**:
-
-- Vulnerabilities in upstream dependencies that are already publicly known — please report those to the upstream maintainer
-- Issues in forks or unofficial distributions
+---
 
 ## Security Best Practices for Users
 
-- Always pin the `# syntax=` directive to a specific digest rather than a floating tag:
-  ```dockerfile
-  # syntax=ghcr.io/broadsage/doko@sha256:<digest>
-  ```
-- Verify the image signature before use with [cosign](https://github.com/sigstore/cosign):
-  ```bash
-  cosign verify ghcr.io/broadsage/doko:<version> \
-    --certificate-identity-regexp "https://github.com/broadsage/doko/.github/workflows/release.yml" \
-    --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-  ```
-- Check the SBOM and provenance attestations attached to each release for supply-chain transparency.
+To keep your builds secure and reproducible, we recommend implementing the following practices:
 
-## Dependency Updates
+### 1. Pin the Frontend Syntax By Digest
+Always pin the `# syntax=` header in your `doko.yaml` files to a specific, immutable SHA256 digest rather than a floating tag (like `:latest` or `:v1`):
+```yaml
+# syntax=ghcr.io/broadsage/doko@sha256:1a40477d945f9f61306eb254f664484cdb4354f5ab8ab1b9bcc8762fe64c816b
+```
 
-We use [Snyk](https://snyk.io) and GitHub's dependency graph to monitor for known vulnerabilities in dependencies. Critical CVEs are patched as soon as a fix is available upstream.
+### 2. Verify Signatures Natively
+Before running or building with Doko images in CI/CD or production, verify their cryptographic signatures using [Cosign](https://github.com/sigstore/cosign):
+```bash
+cosign verify ghcr.io/broadsage/doko:<version> \
+  --certificate-identity-regexp "^https://github.com/broadsage/doko/.github/workflows/release.yml" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
+```
+
+### 3. Review Image Attestations
+Inspect the Software Bill of Materials (SBOM) and SLSA provenance metadata attached to the OCI index registry entry of every release to verify supply-chain compliance.
