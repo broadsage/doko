@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/broadsage/doko/internal/signature"
 )
 
 func TestRunInitAndValidate(t *testing.T) {
@@ -116,64 +114,6 @@ func TestRunLint(t *testing.T) {
 	}
 }
 
-func TestCLICommandsWithMocks(t *testing.T) {
-	oldExec := signature.ExecCommand
-	oldLookPath := signature.LookPath
-	defer func() {
-		signature.ExecCommand = oldExec
-		signature.LookPath = oldLookPath
-	}()
-
-	signature.LookPath = func(file string) (string, error) {
-		return "/usr/bin/" + file, nil
-	}
-	signature.ExecCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
-		return exec.CommandContext(ctx, "echo")
-	}
-
-	t.Run("runKeygen Success", func(t *testing.T) {
-		err := runKeygen([]string{"--out", t.TempDir()})
-		if err != nil {
-			t.Errorf("runKeygen failed: %v", err)
-		}
-	})
-
-	t.Run("runKeygen Invalid Arg", func(t *testing.T) {
-		err := runKeygen([]string{"--invalid-flag"})
-		if err == nil {
-			t.Error("expected runKeygen to fail on invalid arg, got nil")
-		}
-	})
-
-	t.Run("runSign Success", func(t *testing.T) {
-		err := runSign([]string{"test-image:latest", "--key", "dummy.key"})
-		if err != nil {
-			t.Errorf("runSign failed: %v", err)
-		}
-	})
-
-	t.Run("runSign Missing Arg", func(t *testing.T) {
-		err := runSign([]string{})
-		if err == nil {
-			t.Error("expected runSign to fail without arguments, got nil")
-		}
-	})
-
-	t.Run("runVerify Success", func(t *testing.T) {
-		err := runVerify([]string{"test-image:latest", "--key", "dummy.key"})
-		if err != nil {
-			t.Errorf("runVerify failed: %v", err)
-		}
-	})
-
-	t.Run("runVerify Missing Arg", func(t *testing.T) {
-		err := runVerify([]string{})
-		if err == nil {
-			t.Error("expected runVerify to fail without arguments, got nil")
-		}
-	})
-}
-
 func TestRunMain(t *testing.T) {
 	t.Log("Helper main runner subprocess")
 	if os.Getenv("GO_RUN_MAIN") == "1" {
@@ -198,8 +138,7 @@ func TestCLIMain_Commands(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		exitCode := 0
 		if err != nil {
-			var exitError *exec.ExitError
-			if errors.As(err, &exitError) {
+			if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 				exitCode = exitError.ExitCode()
 			} else {
 				exitCode = -1
@@ -247,27 +186,6 @@ func TestCLIMain_Commands(t *testing.T) {
 		out, code := runMainSubprocess("lint", "non-existent.yaml")
 		if code != 1 || !strings.Contains(out, "Error:") {
 			t.Errorf("expected lint failure, got code %d, output: %s", code, out)
-		}
-	})
-
-	t.Run("sign-error", func(t *testing.T) {
-		out, code := runMainSubprocess("sign")
-		if code != 1 || !strings.Contains(out, "Error:") {
-			t.Errorf("expected sign failure, got code %d, output: %s", code, out)
-		}
-	})
-
-	t.Run("verify-error", func(t *testing.T) {
-		out, code := runMainSubprocess("verify")
-		if code != 1 || !strings.Contains(out, "Error:") {
-			t.Errorf("expected verify failure, got code %d, output: %s", code, out)
-		}
-	})
-
-	t.Run("keygen-error", func(t *testing.T) {
-		out, code := runMainSubprocess("keygen", "--invalid-flag")
-		if code != 1 || !strings.Contains(out, "Error:") {
-			t.Errorf("expected keygen failure, got code %d, output: %s", code, out)
 		}
 	})
 }

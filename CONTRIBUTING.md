@@ -14,11 +14,9 @@ Before contributing code, make sure you have the following tools installed:
 
 | Tool | Version | Purpose |
 |---|---|---|
-| [Go](https://go.dev/dl/) | 1.25+ | Build and test |
+| [Go](https://go.dev/dl/) | 1.26.3+ | Build and test |
 | [Docker](https://docs.docker.com/engine/install/) | 24+ | Run builds and dev environment |
 | [golangci-lint](https://golangci-lint.run/usage/install/) | v2.12.2 | Code linting |
-| [goreleaser](https://goreleaser.com/install/) | v2 | Release snapshot builds |
-| [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) | v2 | Image signing |
 
 Verify your setup at any time:
 
