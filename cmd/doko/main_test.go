@@ -138,8 +138,7 @@ func TestCLIMain_Commands(t *testing.T) {
 		output, err := cmd.CombinedOutput()
 		exitCode := 0
 		if err != nil {
-			var exitError *exec.ExitError
-			if errors.As(err, &exitError) {
+			if exitError, ok := errors.AsType[*exec.ExitError](err); ok {
 				exitCode = exitError.ExitCode()
 			} else {
 				exitCode = -1
