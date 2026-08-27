@@ -1,0 +1,50 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    reviewers:
+      - broadsage/maintainers
+    groups:
+      containerd:
+        patterns:
+          - github.com/containerd/*
+      moby:
+        patterns:
+          - github.com/moby/*
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    reviewers:
+      - broadsage/maintainers
+    groups:
+      docker-base-images:
+        patterns:
+          - '*'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    reviewers:
+      - broadsage/maintainers
+    groups:
+      github-actions:
+        update-types:
+          - minor
+          - patch
