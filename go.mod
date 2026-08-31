@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/moby/buildkit v0.32.2
-	github.com/open-policy-agent/opa v1.19.1
+	github.com/open-policy-agent/opa v1.20.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/tonistiigi/fsutil v0.0.0-20260819142231-83cac42c1c52
